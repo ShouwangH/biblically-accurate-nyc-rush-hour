@@ -35,6 +35,10 @@ module.exports = {
     'react/prop-types': 'off', // Using TypeScript for props
     'react-hooks/rules-of-hooks': 'error',
     'react-hooks/exhaustive-deps': 'warn',
+    // Allow R3F/Three.js JSX properties (position, intensity, castShadow, etc.)
+    'react/no-unknown-property': ['error', {
+      ignore: ['position', 'intensity', 'castShadow', 'args', 'rotation', 'scale', 'attach', 'object']
+    }],
 
     // General
     'no-console': ['warn', { allow: ['warn', 'error'] }],

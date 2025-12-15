@@ -23,6 +23,12 @@ function AppContent() {
 
   // Data is loaded - show summary for now
   // Future PRs will render Scene with Buildings, Trains, etc.
+ * Renders the main 3D scene with environment.
+ * Will be wrapped with providers (DataProvider, SimulationTimeProvider) in future PRs.
+ */
+import { Scene } from './components/Scene';
+
+export function App() {
   return (
     <div
       style={{
@@ -44,6 +50,20 @@ function AppContent() {
         {data?.trainSchedules.trains.length ?? 0} train runs,{' '}
         {data?.roadSegments.segments.length ?? 0} road segments
       </p>
+        margin: 0,
+        padding: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <Scene>
+        {/* Future components will be added here:
+         * - Buildings
+         * - SubwayLines
+         * - Trains
+         * - StationBeams
+         * - Traffic
+         */}
+      </Scene>
     </div>
   );
 }

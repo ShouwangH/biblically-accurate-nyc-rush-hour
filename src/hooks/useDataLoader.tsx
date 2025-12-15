@@ -1,0 +1,219 @@
+/**
+ * Data Loading Infrastructure
+ *
+ * Provides centralized data loading for all simulation data files.
+ * Components access data via useData() hook, never via direct fetch().
+ *
+ * Pattern per CLAUDE.md §8.4:
+ * - DataProvider loads ALL JSON files at once
+ * - Renders children only when data is ready
+ * - Provides data via context
+ */
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
+import type {
+  SimulationData,
+  StationsFile,
+  SubwayLinesFile,
+  TrainSchedulesFile,
+  RoadSegmentsFile,
+} from '../data/types';
+
+// =============================================================================
+// Error Type
+// =============================================================================
+
+/**
+ * Custom error class for data loading failures.
+ * Includes the file that failed to load for better debugging.
+ */
+export class DataError extends Error {
+  constructor(
+    message: string,
+    public readonly file: string
+  ) {
+    super(message);
+    this.name = 'DataError';
+  }
+}
+
+// =============================================================================
+// Context Types
+// =============================================================================
+
+interface DataContextValue {
+  /** Loaded simulation data, null while loading or on error */
+  data: SimulationData | null;
+  /** True while data is being fetched */
+  isLoading: boolean;
+  /** Error if loading failed, null otherwise */
+  error: DataError | null;
+}
+
+// =============================================================================
+// Context
+// =============================================================================
+
+const DataContext = createContext<DataContextValue | null>(null);
+
+// =============================================================================
+// Asset Paths
+// =============================================================================
+
+// In Vite, assets in public/ are served at root
+// Assets in src/assets/ need to be imported or use ?url
+const ASSET_PATHS = {
+  stations: '/assets/stations.sample.json',
+  subwayLines: '/assets/subway_lines.sample.json',
+  trainSchedules: '/assets/train_schedules.sample.json',
+  roadSegments: '/assets/road_segments.sample.json',
+} as const;
+
+// =============================================================================
+// Fetch Helpers
+// =============================================================================
+
+/**
+ * Fetches and parses a JSON file, throwing DataError on failure.
+ */
+async function fetchJson<T>(path: string, fileName: string): Promise<T> {
+  const response = await fetch(path);
+
+  if (!response.ok) {
+    throw new DataError(
+      `Failed to fetch ${fileName}: ${response.status} ${response.statusText}`,
+      fileName
+    );
+  }
+
+  return response.json() as Promise<T>;
+}
+
+/**
+ * Loads all simulation data files in parallel.
+ */
+async function loadAllData(): Promise<SimulationData> {
+  const [stations, subwayLines, trainSchedules, roadSegments] =
+    await Promise.all([
+      fetchJson<StationsFile>(ASSET_PATHS.stations, 'stations.json'),
+      fetchJson<SubwayLinesFile>(ASSET_PATHS.subwayLines, 'subway_lines.json'),
+      fetchJson<TrainSchedulesFile>(
+        ASSET_PATHS.trainSchedules,
+        'train_schedules.json'
+      ),
+      fetchJson<RoadSegmentsFile>(
+        ASSET_PATHS.roadSegments,
+        'road_segments.json'
+      ),
+    ]);
+
+  return {
+    stations,
+    subwayLines,
+    trainSchedules,
+    roadSegments,
+  };
+}
+
+// =============================================================================
+// Provider Component
+// =============================================================================
+
+interface DataProviderProps {
+  children: ReactNode;
+}
+
+/**
+ * DataProvider loads all simulation data and provides it via context.
+ *
+ * Usage:
+ * ```tsx
+ * <DataProvider>
+ *   <App />
+ * </DataProvider>
+ * ```
+ */
+export function DataProvider({ children }: DataProviderProps) {
+  const [data, setData] = useState<SimulationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<DataError | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const loadedData = await loadAllData();
+
+        if (!cancelled) {
+          setData(loadedData);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          if (err instanceof DataError) {
+            setError(err);
+          } else if (err instanceof Error) {
+            setError(new DataError(err.message, 'unknown'));
+          } else {
+            setError(new DataError('Unknown error loading data', 'unknown'));
+          }
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const value: DataContextValue = {
+    data,
+    isLoading,
+    error,
+  };
+
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+}
+
+// =============================================================================
+// Hook
+// =============================================================================
+
+/**
+ * Hook to access simulation data from the DataProvider context.
+ *
+ * Must be used within a DataProvider.
+ *
+ * @returns Object with data, isLoading, and error properties
+ * @throws Error if used outside of DataProvider
+ *
+ * Usage:
+ * ```tsx
+ * function MyComponent() {
+ *   const { data, isLoading, error } = useData();
+ *
+ *   if (isLoading) return <LoadingScreen />;
+ *   if (error) return <ErrorScreen error={error} />;
+ *
+ *   return <div>{data.stations.stations.length} stations loaded</div>;
+ * }
+ * ```
+ */
+export function useData(): DataContextValue {
+  const context = useContext(DataContext);
+
+  if (context === null) {
+    throw new Error('useData must be used within a DataProvider');
+  }
+
+  return context;
+}

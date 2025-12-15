@@ -1,0 +1,163 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "NYC Rush Hour Building Generator"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Building_1",
+      "mesh": 0,
+      "translation": [
+        1200,
+        75,
+        800
+      ],
+      "scale": [
+        50,
+        150,
+        50
+      ]
+    },
+    {
+      "name": "Building_2",
+      "mesh": 0,
+      "translation": [
+        1300,
+        100,
+        750
+      ],
+      "scale": [
+        40,
+        200,
+        60
+      ]
+    },
+    {
+      "name": "Building_3",
+      "mesh": 0,
+      "translation": [
+        1150,
+        50,
+        900
+      ],
+      "scale": [
+        80,
+        100,
+        40
+      ]
+    },
+    {
+      "name": "Building_4",
+      "mesh": 0,
+      "translation": [
+        1400,
+        125,
+        850
+      ],
+      "scale": [
+        60,
+        250,
+        60
+      ]
+    },
+    {
+      "name": "Building_5",
+      "mesh": 0,
+      "translation": [
+        1250,
+        90,
+        700
+      ],
+      "scale": [
+        45,
+        180,
+        45
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Box",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1
+          },
+          "indices": 2
+        }
+      ]
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3",
+      "max": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "min": [
+        -0.5,
+        -0.5,
+        -0.5
+      ]
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 0,
+      "componentType": 5123,
+      "count": 36,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 288,
+      "byteLength": 288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 576,
+      "byteLength": 72,
+      "target": 34963
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "buildings.bin",
+      "byteLength": 648
+    }
+  ]
+}

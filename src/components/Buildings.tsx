@@ -26,7 +26,7 @@ export const BUILDING_MATERIAL_PROPS = {
 } as const;
 
 /** Default path to building model */
-const DEFAULT_BUILDING_URL = '/assets/buildings.sample.gltf';
+const DEFAULT_BUILDING_URL = '/assets/buildings.glb';
 
 // =============================================================================
 // Component

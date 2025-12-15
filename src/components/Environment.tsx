@@ -21,7 +21,7 @@ export const BACKGROUND_COLOR = '#F5F5F0';
 export const FOG_COLOR = BACKGROUND_COLOR;
 
 /** Fog start distance (meters) */
-export const FOG_NEAR = 500;
+export const FOG_NEAR = 2000;
 
 /** Fog end distance (meters) - city-scale visibility */
 export const FOG_FAR = 8000;

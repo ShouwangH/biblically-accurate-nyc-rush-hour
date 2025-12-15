@@ -1,0 +1,4 @@
+# Placeholder for utility functions
+# - coordinates.ts (WGS84 ↔ local)
+# - interpolation.ts (polyline helpers)
+# - sliceIndex.ts (canonical getSliceIndex)

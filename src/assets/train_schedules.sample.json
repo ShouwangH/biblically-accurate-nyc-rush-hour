@@ -1,0 +1,97 @@
+{
+  "meta": {
+    "interpolationMode": "linear"
+  },
+  "trains": [
+    {
+      "id": "A-north-001-seg0",
+      "lineId": "A",
+      "segmentIndex": 0,
+      "direction": 1,
+      "tEnter": 0.0,
+      "tExit": 0.15,
+      "crowding": 0.75
+    },
+    {
+      "id": "A-south-001-seg0",
+      "lineId": "A",
+      "segmentIndex": 0,
+      "direction": -1,
+      "tEnter": 0.05,
+      "tExit": 0.20,
+      "crowding": 0.60
+    },
+    {
+      "id": "A-north-002-seg0",
+      "lineId": "A",
+      "segmentIndex": 0,
+      "direction": 1,
+      "tEnter": 0.10,
+      "tExit": 0.25,
+      "crowding": 0.85
+    },
+    {
+      "id": "2-north-001-seg0",
+      "lineId": "2",
+      "segmentIndex": 0,
+      "direction": 1,
+      "tEnter": 0.02,
+      "tExit": 0.18,
+      "crowding": 0.70
+    },
+    {
+      "id": "2-south-001-seg0",
+      "lineId": "2",
+      "segmentIndex": 0,
+      "direction": -1,
+      "tEnter": 0.08,
+      "tExit": 0.22,
+      "crowding": 0.55
+    },
+    {
+      "id": "J-east-001-seg0",
+      "lineId": "J",
+      "segmentIndex": 0,
+      "direction": 1,
+      "tEnter": 0.03,
+      "tExit": 0.12,
+      "crowding": 0.45
+    },
+    {
+      "id": "J-east-001-seg1",
+      "lineId": "J",
+      "segmentIndex": 1,
+      "direction": 1,
+      "tEnter": 0.12,
+      "tExit": 0.20,
+      "crowding": 0.45
+    },
+    {
+      "id": "A-north-003-seg0",
+      "lineId": "A",
+      "segmentIndex": 0,
+      "direction": 1,
+      "tEnter": 0.50,
+      "tExit": 0.65,
+      "crowding": 0.40
+    },
+    {
+      "id": "2-north-002-seg0",
+      "lineId": "2",
+      "segmentIndex": 0,
+      "direction": 1,
+      "tEnter": 0.60,
+      "tExit": 0.75,
+      "crowding": 0.35
+    },
+    {
+      "id": "J-west-001-seg1",
+      "lineId": "J",
+      "segmentIndex": 1,
+      "direction": -1,
+      "tEnter": 0.70,
+      "tExit": 0.85,
+      "crowding": 0.30
+    }
+  ]
+}

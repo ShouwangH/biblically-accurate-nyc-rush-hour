@@ -40,6 +40,9 @@ export interface VehicleState {
 
   /** Congestion factor from segment (avgSpeed/freeFlowSpeed) */
   congestion: number;
+
+  /** Speed in meters per second */
+  speedMps: number;
 }
 
 /**
@@ -180,6 +183,7 @@ export class TrafficEngine {
         position: [...vehicle.position] as Point3D,
         progress: vehicle.progress,
         congestion: vehicle.segment.congestionFactor,
+        speedMps: vehicle.speedMps,
       });
     }
 
@@ -267,6 +271,9 @@ export class TrafficEngine {
    * Move all active vehicles based on their speed and delta time.
    */
   private moveVehicles(dt: number): void {
+    // Guard against negative dt (can happen with time scrubbing)
+    const safeDt = Math.max(0, dt);
+
     for (const vehicle of this.vehicles) {
       if (!vehicle.active) continue;
 
@@ -277,7 +284,7 @@ export class TrafficEngine {
       }
 
       // Calculate distance traveled this frame
-      const distanceTraveled = vehicle.speedMps * dt;
+      const distanceTraveled = vehicle.speedMps * safeDt;
 
       // Convert to progress delta
       const progressDelta = distanceTraveled / vehicle.segmentLength;

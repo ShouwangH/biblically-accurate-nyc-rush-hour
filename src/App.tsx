@@ -4,6 +4,7 @@
  * Renders the main 3D visualization with all layers:
  * - Buildings (static glTF)
  * - SubwayLines (tube geometries)
+ * - RoadSegments (line geometry)
  * - Trains (instanced, animated)
  * - StationBeams (instanced, animated)
  * - Traffic (instanced, animated)
@@ -13,6 +14,7 @@ import { Suspense } from 'react';
 import { Scene } from './components/Scene';
 import { Buildings } from './components/Buildings';
 import { SubwayLines } from './components/SubwayLines';
+import { RoadSegments } from './components/RoadSegments';
 import { Trains } from './components/Trains';
 import { StationBeams } from './components/StationBeams';
 import { Traffic } from './components/Traffic';
@@ -73,6 +75,7 @@ export function App() {
                 {/* Static geometry */}
                 <Buildings />
                 <SubwayLines />
+                <RoadSegments />
 
                 {/* Animated instanced meshes */}
                 <Trains />

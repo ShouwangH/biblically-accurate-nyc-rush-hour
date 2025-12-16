@@ -9,8 +9,8 @@
  * - Environment (lights, fog, background)
  */
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
 import { Environment } from './Environment';
+import { CameraController } from './CameraController';
 
 // =============================================================================
 // Camera Configuration
@@ -63,15 +63,8 @@ export function Scene({ children }: SceneProps) {
       {/* Scene environment (lights, fog, background) */}
       <Environment />
 
-      {/* Camera controls for interactive exploration */}
-      <OrbitControls
-        enableDamping
-        dampingFactor={0.05}
-        minDistance={100}
-        maxDistance={10000}
-        maxPolarAngle={Math.PI / 2.1} // Prevent going below ground
-        target={[1500, 0, 800]} // Look at approximate center of Manhattan south of 34th
-      />
+      {/* Camera controller (auto/manual modes with keyframe animation) */}
+      <CameraController />
 
       {/* Child components (buildings, trains, etc.) */}
       {children}

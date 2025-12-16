@@ -271,7 +271,7 @@ export class TrafficEngine {
    * Move all active vehicles based on their speed and delta time.
    */
   private moveVehicles(dt: number): void {
-    // Guard against negative dt (can happen with time scrubbing)
+    // Guard against negative dt - don't move backwards
     const safeDt = Math.max(0, dt);
 
     for (const vehicle of this.vehicles) {
@@ -289,8 +289,8 @@ export class TrafficEngine {
       // Convert to progress delta
       const progressDelta = distanceTraveled / vehicle.segmentLength;
 
-      // Update progress
-      vehicle.progress = Math.min(1, vehicle.progress + progressDelta);
+      // Update progress (clamped to [0, 1])
+      vehicle.progress = Math.max(0, Math.min(1, vehicle.progress + progressDelta));
 
       // Update position via interpolation
       const newPosition = interpolatePolyline(

@@ -65,6 +65,8 @@ export function Buildings({ url = DEFAULT_BUILDING_URL }: BuildingsProps) {
         roughness: BUILDING_MATERIAL_PROPS.roughness,
         metalness: BUILDING_MATERIAL_PROPS.metalness,
         flatShading: BUILDING_MATERIAL_PROPS.flatShading,
+        // Render both sides to ensure buildings look solid from any angle
+        side: THREE.DoubleSide,
       }),
     []
   );

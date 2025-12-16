@@ -1,18 +1,21 @@
 /**
  * TrafficEngine - Pure TypeScript simulation logic for road traffic.
  *
- * Manages vehicle spawning, movement, and removal on road segments.
- * Vehicles spawn based on per-slice spawn rates and move along segments
- * at speeds determined by congestion data.
+ * Manages vehicle spawning, movement, and removal for the traffic visualization.
  *
  * Per CLAUDE.md §8.3: Engine owns state computation, components only render.
+ * Per CLAUDE.md §8.5: Vehicle spawning happens on slice transitions, not per-frame.
  *
- * IMPORTANT: getVehicles() returns DEFENSIVE COPIES of position arrays.
- * This prevents callers from accidentally mutating internal engine state.
+ * Key behaviors:
+ * - Spawns vehicles only when entering a new time slice
+ * - Moves vehicles along road segments based on avgSpeedMph
+ * - Removes vehicles that complete their segment (progress >= 1)
+ * - Enforces a maximum vehicle limit
+ * - Uses object pooling to minimize GC pressure
  */
 import type { RoadSegment, Point3D } from '../data/types';
-import { interpolatePolyline, getPolylineLength } from '../utils/interpolation';
 import { getSliceIndex } from '../utils/sliceIndex';
+import { interpolatePolyline, getPolylineLength } from '../utils/interpolation';
 
 // =============================================================================
 // Types

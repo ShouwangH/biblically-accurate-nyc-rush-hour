@@ -1,18 +1,18 @@
 /**
  * Tests for TrafficEngine
  *
- * TDD: These tests define the expected behavior for road traffic simulation.
+ * TDD: These tests define the expected behavior for traffic simulation.
  *
  * The TrafficEngine is a pure TypeScript class that:
- * - Spawns vehicles on road segments based on spawnRates per time slice
- * - Moves vehicles along segments based on avgSpeed
- * - Removes vehicles when they reach the end of their segment
- * - Returns VehicleState with DEFENSIVE COPIES of position arrays
+ * - Spawns vehicles only on slice transitions (not per-frame)
+ * - Moves vehicles along road segments based on speed
+ * - Removes vehicles that complete their segment
+ * - Enforces a maximum vehicle limit
+ * - Uses object pooling for performance
  *
  * Per CLAUDE.md §8.3: Engine owns state computation, components only render.
- * Per CLAUDE.md §8.7: TDD is required.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { TrafficEngine, VehicleState } from './TrafficEngine';
 import type { RoadSegment, Point3D } from '../data/types';
 
@@ -21,53 +21,53 @@ import type { RoadSegment, Point3D } from '../data/types';
 // =============================================================================
 
 /**
- * Mock road segment: straight line 100m along x-axis at street level.
- * avgSpeed: 20 mph, freeFlow: 30 mph => congestionFactor: 0.667
+ * Mock road segment: 100m straight line at street level.
+ * At 10 mph ≈ 4.47 m/s, a vehicle takes ~22.4 seconds to traverse.
  */
-const mockSegmentSimple: RoadSegment = {
-  id: 'seg1',
+const mockSegment: RoadSegment = {
+  id: 's1',
   type: 'avenue',
   points: [
     [0, 0, 0],
     [100, 0, 0],
   ] as Point3D[],
-  avgSpeedMph: 20,
-  freeFlowSpeedMph: 30,
-  congestionFactor: 20 / 30, // ~0.667
-  spawnRates: Array(60).fill(0).map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 0)),
+  avgSpeedMph: 10,
+  freeFlowSpeedMph: 25,
+  congestionFactor: 0.4,
+  spawnRates: Array<number>(60).fill(2), // 2 vehicles per slice
 };
 
 /**
- * Mock segment with L-shape: 100m + 100m = 200m total
+ * Mock segment with varying spawn rates.
  */
-const mockSegmentLShaped: RoadSegment = {
-  id: 'seg2',
+const mockSegmentVarying: RoadSegment = {
+  id: 's2',
   type: 'street',
   points: [
-    [0, 0, 0],
-    [100, 0, 0],
-    [100, 0, 100],
+    [0, 0, 100],
+    [50, 0, 100],
   ] as Point3D[],
   avgSpeedMph: 15,
-  freeFlowSpeedMph: 25,
-  congestionFactor: 15 / 25, // 0.6
-  spawnRates: Array(60).fill(2), // Constant 2 vehicles per slice
+  freeFlowSpeedMph: 30,
+  congestionFactor: 0.5,
+  spawnRates: [5, 3, 1, 0, ...Array<number>(56).fill(2)], // Varying rates
 };
 
 /**
- * Fast segment for testing vehicle removal
+ * Mock L-shaped segment: 100m + 100m = 200m total.
  */
-const mockSegmentFast: RoadSegment = {
-  id: 'seg3',
+const mockLShapedSegment: RoadSegment = {
+  id: 's3',
   type: 'highway',
   points: [
-    [0, 0, 0],
-    [50, 0, 0], // Short 50m segment
+    [0, 0, 200],
+    [100, 0, 200],
+    [100, 0, 300],
   ] as Point3D[],
-  avgSpeedMph: 60, // Fast
-  freeFlowSpeedMph: 65,
-  congestionFactor: 60 / 65,
-  spawnRates: Array(60).fill(1),
+  avgSpeedMph: 20,
+  freeFlowSpeedMph: 40,
+  congestionFactor: 0.5,
+  spawnRates: Array<number>(60).fill(1),
 };
 
 // =============================================================================
@@ -76,317 +76,364 @@ const mockSegmentFast: RoadSegment = {
 
 describe('TrafficEngine', () => {
   describe('constructor', () => {
-    it('creates an engine with segments and maxVehicles', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
+    it('creates an engine with segments and max vehicles', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
       expect(engine).toBeDefined();
+    });
+
+    it('starts with zero vehicles', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      expect(engine.getVehicleCount()).toBe(0);
     });
 
     it('handles empty segments array', () => {
       const engine = new TrafficEngine([], 100);
-      expect(engine.getVehicles()).toEqual([]);
-    });
-
-    it('respects maxVehicles limit', () => {
-      // Segment that spawns lots of vehicles
-      const highSpawnSegment: RoadSegment = {
-        ...mockSegmentSimple,
-        spawnRates: Array(60).fill(100), // 100 per slice
-      };
-      const engine = new TrafficEngine([highSpawnSegment], 10);
-
-      // Trigger spawn by crossing into slice 0
-      engine.update(0.001, 0.016);
-
-      expect(engine.getVehicles().length).toBeLessThanOrEqual(10);
+      expect(engine.getVehicleCount()).toBe(0);
+      engine.update(0.01, 0.016);
+      expect(engine.getVehicleCount()).toBe(0);
     });
   });
 
-  describe('spawning', () => {
-    it('spawns vehicles on slice transition', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
+  describe('spawning - slice transitions', () => {
+    it('spawns vehicles on first update (slice 0 entry)', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
 
-      // Initial update at t=0.001 (slice 0) should spawn vehicles
-      engine.update(0.001, 0.016);
-
-      const vehicles = engine.getVehicles();
-      expect(vehicles.length).toBe(5); // spawnRates[0] = 5
+      engine.update(0.005, 0.016); // t=0.005 is in slice 0
+      expect(engine.getVehicleCount()).toBe(2); // spawnRates[0] = 2
     });
 
-    it('spawns more vehicles on next slice transition', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
+    it('does not spawn on same slice', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
 
-      // First slice
-      engine.update(0.001, 0.016);
-      expect(engine.getVehicles().length).toBe(5);
+      engine.update(0.005, 0.016); // slice 0, spawns 2
+      const countAfterFirst = engine.getVehicleCount();
 
-      // Move to slice 1 (t >= 1/60 = 0.0167)
+      engine.update(0.01, 0.016); // still slice 0
+      expect(engine.getVehicleCount()).toBe(countAfterFirst);
+
+      engine.update(0.015, 0.016); // still slice 0
+      expect(engine.getVehicleCount()).toBe(countAfterFirst);
+    });
+
+    it('spawns on slice transition', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+
+      engine.update(0.005, 0.016); // slice 0, spawns 2
+      expect(engine.getVehicleCount()).toBe(2);
+
+      // t = 1/60 ≈ 0.01667 is slice 1
+      engine.update(0.02, 0.016); // slice 1, spawns 2 more
+      expect(engine.getVehicleCount()).toBe(4);
+    });
+
+    it('spawns correct count per slice based on spawnRates', () => {
+      const engine = new TrafficEngine([mockSegmentVarying], 100);
+
+      // Slice 0: spawnRates[0] = 5
+      engine.update(0.005, 0.016);
+      expect(engine.getVehicleCount()).toBe(5);
+
+      // Slice 1: spawnRates[1] = 3
       engine.update(0.02, 0.016);
+      expect(engine.getVehicleCount()).toBe(8);
 
-      // Should have previous vehicles (minus any removed) plus new spawns
-      // Slice 1 spawns 3 more
-      expect(engine.getVehicles().length).toBeGreaterThanOrEqual(3);
+      // Slice 2: spawnRates[2] = 1
+      engine.update(0.04, 0.016);
+      expect(engine.getVehicleCount()).toBe(9);
+
+      // Slice 3: spawnRates[3] = 0
+      engine.update(0.06, 0.016);
+      expect(engine.getVehicleCount()).toBe(9); // No new spawns
     });
 
-    it('does NOT spawn when staying in same slice', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
+    it('spawns from all segments', () => {
+      const engine = new TrafficEngine([mockSegment, mockSegmentVarying], 100);
 
-      // Enter slice 0
-      engine.update(0.001, 0.016);
-      const countAfterFirst = engine.getVehicles().length;
+      // Slice 0: s1 spawns 2, s2 spawns 5
+      engine.update(0.005, 0.016);
+      expect(engine.getVehicleCount()).toBe(7);
+    });
 
-      // Still in slice 0 (t < 1/60 = 0.0167)
+    it('handles jumping multiple slices in one update', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+
+      // Jump from uninitialized to slice 3 (skip 0, 1, 2)
+      // Should only spawn for the current slice (3), not catch up
+      engine.update(0.06, 0.016); // slice 3
+      expect(engine.getVehicleCount()).toBe(2); // Just current slice
+    });
+  });
+
+  describe('vehicle movement', () => {
+    it('moves vehicles forward on update', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
       engine.update(0.005, 0.016);
 
-      // No additional spawns
-      expect(engine.getVehicles().length).toBeLessThanOrEqual(countAfterFirst);
+      const vehiclesBefore = engine.getVehicles();
+      const progressBefore = vehiclesBefore[0]!.progress;
+
+      // Update with 1 second dt
+      engine.update(0.006, 1.0);
+      const vehiclesAfter = engine.getVehicles();
+      const progressAfter = vehiclesAfter[0]!.progress;
+
+      expect(progressAfter).toBeGreaterThan(progressBefore);
     });
 
-    it('spawns at start of each segment', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
-      engine.update(0.001, 0.016);
+    it('moves vehicles at correct speed', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
+
+      // mockSegment: 100m at 10 mph = 4.47 m/s
+      // After 1 second, should move 4.47m out of 100m = 0.0447 progress
+      const dt = 1.0;
+      engine.update(0.006, dt);
+
+      const vehicle = engine.getVehicles()[0]!;
+
+      // 10 mph = 10 * 1609.34 / 3600 ≈ 4.47 m/s
+      // Progress = 4.47 / 100 = 0.0447
+      expect(vehicle.progress).toBeCloseTo(0.0447, 2);
+    });
+
+    it('updates position along polyline', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      // Spawn with zero dt to avoid initial movement
+      engine.update(0.005, 0);
+
+      // Move to progress ≈ 0.5
+      // Need dt such that progress = 0.5
+      // 10 mph = 4.47 m/s, 50m / 4.47 ≈ 11.2 seconds
+      engine.update(0.006, 11.2);
+
+      const vehicle = engine.getVehicles()[0]!;
+      expect(vehicle.position[0]).toBeCloseTo(50, 0); // Within 0.5m
+      expect(vehicle.position[1]).toBe(0);
+      expect(vehicle.position[2]).toBe(0);
+    });
+  });
+
+  describe('vehicle removal', () => {
+    it('removes vehicles that complete their segment', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
+      expect(engine.getVehicleCount()).toBe(2);
+
+      // Move vehicles to completion
+      // 100m at 4.47 m/s = 22.4 seconds
+      engine.update(0.006, 23);
+
+      expect(engine.getVehicleCount()).toBe(0);
+    });
+
+    it('removes only completed vehicles', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      // Spawn with zero dt
+      engine.update(0.005, 0);
+      expect(engine.getVehicleCount()).toBe(2);
+
+      // Move to about 50% progress: 11.2 seconds for 50m at 4.47 m/s
+      engine.update(0.006, 11.2);
+
+      // Both vehicles should still be active (around 50% progress)
+      expect(engine.getVehicleCount()).toBe(2);
+
+      // Move one more half of the segment - first spawned vehicles complete
+      engine.update(0.007, 11.5);
+
+      // All vehicles spawned at the same time, so both should complete together
+      expect(engine.getVehicleCount()).toBe(0);
+    });
+  });
+
+  describe('max vehicle limit', () => {
+    it('respects max vehicle limit', () => {
+      const engine = new TrafficEngine([mockSegment], 3);
+
+      // Multiple slice transitions - would spawn 2 per slice
+      engine.update(0.005, 0.016); // slice 0: spawn 2
+      engine.update(0.02, 0.016); // slice 1: would spawn 2 more, but capped at 3
+
+      expect(engine.getVehicleCount()).toBeLessThanOrEqual(3);
+    });
+
+    it('spawns up to max limit even across segments', () => {
+      const engine = new TrafficEngine([mockSegment, mockSegmentVarying], 5);
+
+      // Would want to spawn 2 + 5 = 7, but capped at 5
+      engine.update(0.005, 0.016);
+      expect(engine.getVehicleCount()).toBe(5);
+    });
+
+    it('allows new spawns after vehicles complete', () => {
+      const engine = new TrafficEngine([mockSegment], 2);
+
+      engine.update(0.005, 0.016);
+      expect(engine.getVehicleCount()).toBe(2);
+
+      // Complete all vehicles
+      engine.update(0.006, 25);
+      expect(engine.getVehicleCount()).toBe(0);
+
+      // New slice should spawn again
+      engine.update(0.02, 0.016);
+      expect(engine.getVehicleCount()).toBe(2);
+    });
+  });
+
+  describe('VehicleState data', () => {
+    it('includes unique id', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
 
       const vehicles = engine.getVehicles();
-
-      // All spawned vehicles should start at segment beginning
-      for (const v of vehicles) {
-        expect(v.position[0]).toBeCloseTo(0, 1);
-        expect(v.position[1]).toBeCloseTo(0, 1);
-        expect(v.position[2]).toBeCloseTo(0, 1);
-      }
-    });
-  });
-
-  describe('movement', () => {
-    let engine: TrafficEngine;
-
-    beforeEach(() => {
-      engine = new TrafficEngine([mockSegmentSimple], 100);
-      // Spawn vehicles at slice 0
-      engine.update(0.001, 0.016);
-    });
-
-    it('moves vehicles along segment over time', () => {
-      const vehiclesBefore = engine.getVehicles();
-      const posBefore = vehiclesBefore[0]!.position[0];
-
-      // Simulate several frames
-      for (let i = 0; i < 10; i++) {
-        engine.update(0.001 + i * 0.001, 0.016);
-      }
-
-      const vehiclesAfter = engine.getVehicles();
-
-      // At least some vehicles should still exist
-      if (vehiclesAfter.length > 0) {
-        // Position should have increased (moving along x-axis)
-        expect(vehiclesAfter[0]!.position[0]).toBeGreaterThan(posBefore);
-      }
-    });
-
-    it('removes vehicles when they reach end of segment', () => {
-      // Use fast, short segment
-      const fastEngine = new TrafficEngine([mockSegmentFast], 100);
-
-      // Spawn at slice 0
-      fastEngine.update(0.001, 0.016);
-      expect(fastEngine.getVehicles().length).toBeGreaterThan(0);
-
-      // Simulate many frames with large dt to move vehicles to end
-      for (let i = 0; i < 100; i++) {
-        fastEngine.update(0.001 + i * 0.0001, 0.5); // Large dt
-      }
-
-      // Eventually vehicles should be removed (progress >= 1)
-      // Some new ones may have spawned, but original should be gone
-    });
-  });
-
-  describe('VehicleState properties', () => {
-    let engine: TrafficEngine;
-    let vehicles: VehicleState[];
-
-    beforeEach(() => {
-      engine = new TrafficEngine([mockSegmentSimple], 100);
-      engine.update(0.001, 0.016);
-      vehicles = engine.getVehicles();
-    });
-
-    it('includes vehicle id', () => {
       expect(vehicles[0]!.id).toBeDefined();
-      expect(typeof vehicles[0]!.id).toBe('string');
+      expect(vehicles[0]!.id).not.toBe(vehicles[1]!.id);
     });
 
     it('includes segment id', () => {
-      expect(vehicles[0]!.segmentId).toBe('seg1');
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
+
+      const vehicle = engine.getVehicles()[0]!;
+      expect(vehicle.segmentId).toBe('s1');
     });
 
-    it('includes position as Point3D', () => {
-      expect(vehicles[0]!.position).toHaveLength(3);
-      expect(typeof vehicles[0]!.position[0]).toBe('number');
-      expect(typeof vehicles[0]!.position[1]).toBe('number');
-      expect(typeof vehicles[0]!.position[2]).toBe('number');
+    it('includes position', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
+
+      const vehicle = engine.getVehicles()[0]!;
+      expect(vehicle.position).toBeDefined();
+      expect(vehicle.position).toHaveLength(3);
     });
 
-    it('includes congestion factor', () => {
-      expect(vehicles[0]!.congestion).toBeCloseTo(20 / 30, 2);
+    it('includes progress in [0, 1]', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
+
+      const vehicle = engine.getVehicles()[0]!;
+      expect(vehicle.progress).toBeGreaterThanOrEqual(0);
+      expect(vehicle.progress).toBeLessThanOrEqual(1);
     });
 
-    it('includes progress along segment', () => {
-      expect(vehicles[0]!.progress).toBeGreaterThanOrEqual(0);
-      expect(vehicles[0]!.progress).toBeLessThanOrEqual(1);
-    });
-  });
+    it('includes congestion factor for color', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
 
-  describe('defensive copying (CRITICAL)', () => {
-    let engine: TrafficEngine;
-
-    beforeEach(() => {
-      engine = new TrafficEngine([mockSegmentSimple], 100);
-      engine.update(0.001, 0.016);
+      const vehicle = engine.getVehicles()[0]!;
+      expect(vehicle.congestion).toBe(mockSegment.congestionFactor);
     });
 
-    it('returns new position array instances on each getVehicles() call', () => {
-      const vehicles1 = engine.getVehicles();
-      const vehicles2 = engine.getVehicles();
+    it('includes speed in m/s', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
 
-      // Same vehicle, different array instances
-      expect(vehicles1[0]!.position).not.toBe(vehicles2[0]!.position);
-    });
-
-    it('mutating returned position does NOT affect engine state', () => {
-      const vehicles1 = engine.getVehicles();
-      const originalX = vehicles1[0]!.position[0];
-
-      // Mutate the returned position
-      vehicles1[0]!.position[0] = 99999;
-
-      // Get fresh state
-      const vehicles2 = engine.getVehicles();
-
-      // Engine state should be unchanged
-      expect(vehicles2[0]!.position[0]).toBeCloseTo(originalX, 5);
-    });
-
-    it('returned position values match internal state', () => {
-      const vehicles = engine.getVehicles();
-
-      // Values should be accurate copies
-      expect(vehicles[0]!.position[0]).toBeGreaterThanOrEqual(0);
-      expect(vehicles[0]!.position[0]).toBeLessThanOrEqual(100);
+      const vehicle = engine.getVehicles()[0]!;
+      // 10 mph ≈ 4.47 m/s
+      expect(vehicle.speedMps).toBeCloseTo(4.47, 1);
     });
   });
 
-  describe('multi-segment scenarios', () => {
-    it('spawns vehicles on multiple segments', () => {
-      const engine = new TrafficEngine(
-        [mockSegmentSimple, mockSegmentLShaped],
-        100
-      );
-      engine.update(0.001, 0.016);
+  describe('L-shaped segment handling', () => {
+    it('correctly positions vehicles on L-shaped segments', () => {
+      const engine = new TrafficEngine([mockLShapedSegment], 100);
+      // Spawn with zero dt
+      engine.update(0.005, 0);
 
-      const vehicles = engine.getVehicles();
+      // 20 mph ≈ 8.94 m/s on 200m segment
+      // To reach corner (100m, progress=0.5): 100/8.94 ≈ 11.2s
+      engine.update(0.006, 11.2);
 
-      // Should have vehicles from both segments
-      const seg1Vehicles = vehicles.filter((v) => v.segmentId === 'seg1');
-      const seg2Vehicles = vehicles.filter((v) => v.segmentId === 'seg2');
-
-      expect(seg1Vehicles.length).toBe(5); // spawnRates[0] for seg1
-      expect(seg2Vehicles.length).toBe(2); // spawnRates[0] for seg2
+      const vehicle = engine.getVehicles()[0]!;
+      expect(vehicle.position[0]).toBeCloseTo(100, 0); // Within 0.5m
+      expect(vehicle.position[2]).toBeCloseTo(200, 0); // Within 0.5m
     });
+  });
 
-    it('interpolates position correctly on L-shaped segment', () => {
-      const engine = new TrafficEngine([mockSegmentLShaped], 100);
-      engine.update(0.001, 0.016);
+  describe('object pooling', () => {
+    it('reuses vehicle objects when possible', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
 
-      // Simulate movement to ~50% progress (should be at corner)
-      // This requires careful timing based on speed
-      for (let i = 0; i < 50; i++) {
-        engine.update(0.001 + i * 0.0005, 0.1);
-      }
+      // Spawn vehicles with zero dt
+      engine.update(0.005, 0);
+      expect(engine.getVehicleCount()).toBe(2);
 
-      const vehicles = engine.getVehicles();
-      if (vehicles.length > 0) {
-        const v = vehicles[0]!;
-        // If progress is ~0.5, should be near [100, 0, 0] corner
-        if (v.progress > 0.4 && v.progress < 0.6) {
-          expect(v.position[0]).toBeCloseTo(100, 10);
-        }
-      }
+      // Complete all vehicles
+      engine.update(0.006, 25);
+      expect(engine.getVehicleCount()).toBe(0);
+
+      // Spawn new vehicles with zero dt
+      engine.update(0.02, 0);
+
+      // Pool reuse is an implementation detail - we just verify
+      // that new vehicles are created with valid state
+      const newVehicles = engine.getVehicles();
+      expect(newVehicles).toHaveLength(2);
+      expect(newVehicles[0]!.progress).toBe(0);
     });
   });
 
   describe('edge cases', () => {
-    it('handles segment with single point gracefully', () => {
-      const singlePointSegment: RoadSegment = {
-        id: 'single',
-        type: 'street',
-        points: [[50, 0, 50]] as Point3D[],
-        avgSpeedMph: 20,
-        freeFlowSpeedMph: 30,
-        congestionFactor: 0.667,
-        spawnRates: Array(60).fill(1),
+    it('handles zero dt gracefully', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
+
+      const progressBefore = engine.getVehicles()[0]!.progress;
+      engine.update(0.006, 0);
+      const progressAfter = engine.getVehicles()[0]!.progress;
+
+      expect(progressAfter).toBe(progressBefore);
+    });
+
+    it('handles negative dt gracefully', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
+      engine.update(0.005, 0.016);
+
+      // Should not crash and should not move backwards
+      engine.update(0.006, -1);
+      const vehicle = engine.getVehicles()[0]!;
+      expect(vehicle.progress).toBeGreaterThanOrEqual(0);
+    });
+
+    it('handles segment with zero spawn rate', () => {
+      const zeroSpawnSegment: RoadSegment = {
+        ...mockSegment,
+        id: 'zero',
+        spawnRates: Array<number>(60).fill(0),
       };
 
-      const engine = new TrafficEngine([singlePointSegment], 100);
-      engine.update(0.001, 0.016);
-
-      // Should not crash
-      const vehicles = engine.getVehicles();
-      expect(vehicles).toBeDefined();
+      const engine = new TrafficEngine([zeroSpawnSegment], 100);
+      engine.update(0.005, 0.016);
+      expect(engine.getVehicleCount()).toBe(0);
     });
 
-    it('handles zero spawn rate', () => {
-      const noSpawnSegment: RoadSegment = {
-        ...mockSegmentSimple,
-        spawnRates: Array(60).fill(0),
+    it('handles very high spawn rate', () => {
+      const highSpawnSegment: RoadSegment = {
+        ...mockSegment,
+        id: 'high',
+        spawnRates: Array<number>(60).fill(1000),
       };
 
-      const engine = new TrafficEngine([noSpawnSegment], 100);
-      engine.update(0.001, 0.016);
-
-      expect(engine.getVehicles()).toEqual([]);
-    });
-
-    it('handles simulation time at boundaries', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
-
-      // t=0 exactly
-      engine.update(0, 0.016);
-      expect(engine.getVehicles()).toBeDefined();
-
-      // t approaching 1
-      engine.update(0.999, 0.016);
-      expect(engine.getVehicles()).toBeDefined();
-    });
-
-    it('handles very small delta time', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
-      engine.update(0.001, 0.016);
-
-      // Very small dt
-      engine.update(0.002, 0.0001);
-
-      expect(engine.getVehicles()).toBeDefined();
-    });
-
-    it('handles very large delta time', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
-      engine.update(0.001, 0.016);
-
-      // Large dt (1 second)
-      engine.update(0.002, 1.0);
-
-      expect(engine.getVehicles()).toBeDefined();
+      const engine = new TrafficEngine([highSpawnSegment], 50);
+      engine.update(0.005, 0.016);
+      expect(engine.getVehicleCount()).toBe(50); // Capped at max
     });
   });
 
-  describe('getVehicleCount', () => {
-    it('returns current number of active vehicles', () => {
-      const engine = new TrafficEngine([mockSegmentSimple], 100);
-      expect(engine.getVehicleCount()).toBe(0);
+  describe('simulation time wrapping', () => {
+    it('handles simulation time going backwards (wrap from 0.99 to 0.01)', () => {
+      const engine = new TrafficEngine([mockSegment], 100);
 
-      engine.update(0.001, 0.016);
-      expect(engine.getVehicleCount()).toBe(5);
+      // Advance to near end
+      engine.update(0.98, 0.016); // slice 58
+      const countBefore = engine.getVehicleCount();
+
+      // Wrap to beginning
+      engine.update(0.01, 0.016); // slice 0 (wrapped)
+
+      // Should spawn for new slice
+      expect(engine.getVehicleCount()).toBeGreaterThanOrEqual(countBefore);
     });
   });
 });
@@ -394,13 +441,14 @@ describe('TrafficEngine', () => {
 describe('VehicleState type', () => {
   it('has required properties', () => {
     // TypeScript compile-time check
-    const state: VehicleState = {
+    const vehicle: VehicleState = {
       id: 'v1',
-      segmentId: 'seg1',
+      segmentId: 's1',
       position: [0, 0, 0],
       progress: 0.5,
-      congestion: 0.7,
+      congestion: 0.5,
+      speedMps: 4.47,
     };
-    expect(state).toBeDefined();
+    expect(vehicle).toBeDefined();
   });
 });

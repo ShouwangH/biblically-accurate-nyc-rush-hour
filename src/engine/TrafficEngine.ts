@@ -203,17 +203,38 @@ export class TrafficEngine {
 
   /**
    * Spawn vehicles for all segments based on the current slice's spawn rates.
+   *
+   * Spawn rate interpretation:
+   * - Rate >= 1: Spawn floor(rate) vehicles guaranteed, plus probability of
+   *              (rate % 1) for one more vehicle
+   * - Rate < 1: Use as probability of spawning a single vehicle
+   *
+   * This handles both:
+   * - Real data with fractional rates (0.12 = 12% chance)
+   * - Test data with integer rates (2 = spawn 2 vehicles)
    */
   private spawnVehiclesForSlice(sliceIndex: number): void {
     for (const segment of this.segments) {
-      const spawnCount = segment.spawnRates[sliceIndex] ?? 0;
+      const spawnRate = segment.spawnRates[sliceIndex] ?? 0;
       const segmentLength = this.segmentLengths.get(segment.id) ?? 0;
 
-      for (let i = 0; i < spawnCount; i++) {
+      // Calculate guaranteed spawns and probability for fractional part
+      const guaranteedSpawns = Math.floor(spawnRate);
+      const fractionalProbability = spawnRate - guaranteedSpawns;
+
+      // Spawn guaranteed vehicles
+      for (let i = 0; i < guaranteedSpawns; i++) {
         if (this.activeCount >= this.maxVehicles) {
           return; // Hit capacity
         }
+        this.spawnVehicle(segment, segmentLength);
+      }
 
+      // Spawn one more with probability of fractional part
+      if (fractionalProbability > 0 && Math.random() < fractionalProbability) {
+        if (this.activeCount >= this.maxVehicles) {
+          return; // Hit capacity
+        }
         this.spawnVehicle(segment, segmentLength);
       }
     }

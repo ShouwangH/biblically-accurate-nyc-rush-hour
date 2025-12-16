@@ -63,19 +63,20 @@ const MAX_SPEED = 10;
 
 /**
  * Default camera keyframes for NYC visualization.
- * Creates a smooth orbit around the city.
+ * Creates a smooth orbit around Lower Manhattan.
+ * Data center is approximately (1800, 0, -2700).
  */
 export const DEFAULT_KEYFRAMES: CameraKeyframe[] = [
   // Start: Overview from southeast
-  { time: 0, position: [2000, 1500, 2000], target: [1500, 0, 800] },
+  { time: 0, position: [4500, 2000, 0], target: [1800, 0, -2700] },
   // Move to east view
-  { time: 0.25, position: [2500, 1000, 800], target: [1500, 0, 800] },
+  { time: 0.25, position: [5000, 1500, -2700], target: [1800, 0, -2700] },
   // Move to north view
-  { time: 0.5, position: [1500, 1200, -500], target: [1500, 0, 800] },
+  { time: 0.5, position: [1800, 1800, -6000], target: [1800, 0, -2700] },
   // Move to west view
-  { time: 0.75, position: [500, 1000, 800], target: [1500, 0, 800] },
+  { time: 0.75, position: [-1500, 1500, -2700], target: [1800, 0, -2700] },
   // Return to start
-  { time: 1, position: [2000, 1500, 2000], target: [1500, 0, 800] },
+  { time: 1, position: [4500, 2000, 0], target: [1800, 0, -2700] },
 ];
 
 // =============================================================================
@@ -426,6 +427,14 @@ export function CameraController({
       minDistance={100}
       maxDistance={10000}
       maxPolarAngle={Math.PI / 2.1}
+      // screenSpacePanning=false makes pan move in horizontal (XZ) plane
+      // This feels more like moving across a map rather than screen-space shifting
+      screenSpacePanning={false}
+      mouseButtons={{
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN,
+      }}
     />
   );
 }

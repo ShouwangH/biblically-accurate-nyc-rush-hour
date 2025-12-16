@@ -4,6 +4,7 @@
  * Renders the main 3D visualization with all layers:
  * - Buildings (static glTF)
  * - SubwayLines (tube geometries)
+ * - RoadSegments (line geometry)
  * - Trains (instanced, animated)
  * - StationBeams (instanced, animated)
  * - Traffic (instanced, animated)
@@ -13,10 +14,16 @@ import { Suspense } from 'react';
 import { Scene } from './components/Scene';
 import { Buildings } from './components/Buildings';
 import { SubwayLines } from './components/SubwayLines';
+import { RoadSegments } from './components/RoadSegments';
 import { Trains } from './components/Trains';
 import { StationBeams } from './components/StationBeams';
 import { Traffic } from './components/Traffic';
 import { PostProcessing } from './components/PostProcessing';
+import {
+  CameraController,
+  CameraControllerProvider,
+} from './components/CameraController';
+import { Overlay, Controls } from './components/UI';
 import { DataProvider } from './hooks/useDataLoader';
 import { SimulationTimeProvider } from './hooks/useSimulationTime';
 
@@ -50,31 +57,41 @@ export function App() {
   return (
     <DataProvider>
       <SimulationTimeProvider>
-        <div
-          style={{
-            width: '100vw',
-            height: '100vh',
-            margin: 0,
-            padding: 0,
-            overflow: 'hidden',
-          }}
-        >
-          <Suspense fallback={<LoadingScreen />}>
-            <Scene>
-              {/* Static geometry */}
-              <Buildings />
-              <SubwayLines />
+        <CameraControllerProvider initialMode="manual">
+          <div
+            style={{
+              width: '100vw',
+              height: '100vh',
+              margin: 0,
+              padding: 0,
+              overflow: 'hidden',
+            }}
+          >
+            <Suspense fallback={<LoadingScreen />}>
+              <Scene>
+                {/* Camera control */}
+                <CameraController />
 
-              {/* Animated instanced meshes */}
-              <Trains />
-              <StationBeams />
-              <Traffic />
+                {/* Static geometry */}
+                <Buildings />
+                <SubwayLines />
+                <RoadSegments />
 
-              {/* Post-processing effects */}
-              <PostProcessing />
-            </Scene>
-          </Suspense>
-        </div>
+                {/* Animated instanced meshes */}
+                <Trains />
+                <StationBeams />
+                <Traffic />
+
+                {/* Post-processing effects */}
+                <PostProcessing />
+              </Scene>
+            </Suspense>
+
+            {/* UI Overlay (outside Canvas) */}
+            <Overlay />
+            <Controls />
+          </div>
+        </CameraControllerProvider>
       </SimulationTimeProvider>
     </DataProvider>
   );

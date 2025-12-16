@@ -120,9 +120,9 @@ describe('Trains component', () => {
     it('exports TRAIN_SIZE constant', async () => {
       const module = await import('../Trains');
       expect(module.TRAIN_SIZE).toBeDefined();
-      expect(module.TRAIN_SIZE.width).toBeGreaterThan(0);
-      expect(module.TRAIN_SIZE.height).toBeGreaterThan(0);
-      expect(module.TRAIN_SIZE.length).toBeGreaterThan(0);
+      expect(module.TRAIN_SIZE.radius).toBeGreaterThan(0);
+      expect(module.TRAIN_SIZE.widthSegments).toBeGreaterThan(0);
+      expect(module.TRAIN_SIZE.heightSegments).toBeGreaterThan(0);
     });
 
     it('exports CROWDING_BRIGHTNESS constant', async () => {

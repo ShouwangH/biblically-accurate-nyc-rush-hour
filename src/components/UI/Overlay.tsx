@@ -1,12 +1,18 @@
 /**
  * Overlay Component
  *
+<<<<<<< feat/real-data
+ * Displays legend for the visualization.
+ * Positioned in corner, doesn't block 3D interaction.
+ */
+=======
  * Displays clock, title, and legend for the visualization.
  * Positioned in corners, doesn't block 3D interaction.
  *
  * Designed for projector readability with large fonts.
  */
 import { useSimulationTime } from '../../hooks/useSimulationTime';
+>>>>>>> main
 
 // =============================================================================
 // Styles
@@ -24,6 +30,8 @@ const overlayStyle: React.CSSProperties = {
   zIndex: 100,
 };
 
+<<<<<<< feat/real-data
+=======
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -45,6 +53,7 @@ const clockStyle: React.CSSProperties = {
   textAlign: 'right',
 };
 
+>>>>>>> main
 const legendContainerStyle: React.CSSProperties = {
   position: 'absolute',
   bottom: '80px',
@@ -99,10 +108,14 @@ const legendBeamStyle: React.CSSProperties = {
 // =============================================================================
 
 /**
+<<<<<<< feat/real-data
+ * Overlay displays legend explaining visual encodings.
+=======
  * Overlay displays visualization metadata:
  * - Title
  * - Current simulation time (clock)
  * - Legend explaining visual encodings
+>>>>>>> main
  *
  * Usage:
  * ```tsx
@@ -113,6 +126,10 @@ const legendBeamStyle: React.CSSProperties = {
  * ```
  */
 export function Overlay() {
+<<<<<<< feat/real-data
+  return (
+    <div data-testid="overlay" style={overlayStyle}>
+=======
   const { displayTime } = useSimulationTime();
 
   return (
@@ -125,6 +142,7 @@ export function Overlay() {
         </div>
       </div>
 
+>>>>>>> main
       {/* Legend */}
       <div data-testid="legend" style={legendContainerStyle}>
         <div style={legendTitleStyle}>Legend</div>

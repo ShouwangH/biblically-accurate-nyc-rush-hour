@@ -37,6 +37,27 @@ vi.mock('@react-three/drei', () => ({
   ),
 }));
 
+// Mock CameraController to avoid needing the provider context
+vi.mock('../CameraController', () => ({
+  CameraController: () => <div data-testid="camera-controller" />,
+  CameraControllerProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useCameraController: () => ({
+    mode: 'auto',
+    setMode: vi.fn(),
+    toggleMode: vi.fn(),
+    cameraTime: 0,
+    setCameraTime: vi.fn(),
+    advanceCameraTime: vi.fn(),
+    currentPosition: [0, 0, 0] as [number, number, number],
+    currentTarget: [0, 0, 0] as [number, number, number],
+    isPlaying: true,
+    play: vi.fn(),
+    pause: vi.fn(),
+    speed: 1,
+    setSpeed: vi.fn(),
+  }),
+}));
+
 // Import after mocks are set up
 import { Scene } from '../Scene';
 
@@ -76,9 +97,9 @@ describe('Scene', () => {
     expect(camera.far).toBeGreaterThan(5000);
   });
 
-  it('includes OrbitControls for camera interaction', () => {
+  it('includes CameraController for camera interaction', () => {
     render(<Scene />);
-    expect(screen.getByTestId('orbit-controls')).toBeInTheDocument();
+    expect(screen.getByTestId('camera-controller')).toBeInTheDocument();
   });
 
   it('renders children inside Canvas', () => {

@@ -22,7 +22,8 @@ import { interpolatePolyline, getPolylineLength } from '../utils/interpolation';
 // =============================================================================
 
 /**
- * Represents a vehicle's current state for rendering.
+ * Represents a vehicle's state at a given moment.
+ * Returned by getVehicles() with DEFENSIVE COPIES of arrays.
  */
 export interface VehicleState {
   /** Unique vehicle identifier */
@@ -31,29 +32,41 @@ export interface VehicleState {
   /** Road segment this vehicle is on */
   segmentId: string;
 
-  /** Current 3D position along the segment */
+  /** Current 3D position (DEFENSIVE COPY - safe to mutate) */
   position: Point3D;
 
   /** Progress along segment [0, 1] */
   progress: number;
 
-  /** Congestion factor from segment (0-1, for color mapping) */
+  /** Congestion factor from segment (avgSpeed/freeFlowSpeed) */
   congestion: number;
-
-  /** Current speed in meters per second */
-  speedMps: number;
 }
 
 /**
- * Internal vehicle object for pooling.
- * Includes additional fields not exposed in VehicleState.
+ * Internal pooled vehicle representation.
+ * Position array is owned by the engine and must not be exposed directly.
  */
-interface PooledVehicle extends VehicleState {
-  /** Whether this vehicle slot is currently active */
-  active: boolean;
+interface PooledVehicle {
+  /** Unique vehicle identifier */
+  id: string;
 
-  /** Length of the segment in meters (cached for speed calculation) */
+  /** Reference to the road segment */
+  segment: RoadSegment;
+
+  /** Cached segment length for performance */
   segmentLength: number;
+
+  /** Current progress along segment [0, 1] */
+  progress: number;
+
+  /** Speed in meters per second */
+  speedMps: number;
+
+  /** Current 3D position (INTERNAL - do not expose directly) */
+  position: Point3D;
+
+  /** Is this vehicle active? */
+  active: boolean;
 }
 
 // =============================================================================
@@ -61,57 +74,55 @@ interface PooledVehicle extends VehicleState {
 // =============================================================================
 
 /** Conversion factor: miles per hour to meters per second */
-const MPH_TO_MPS = 1609.34 / 3600; // ≈ 0.44704
+const MPH_TO_MPS = 0.44704;
 
 // =============================================================================
 // Engine Class
 // =============================================================================
 
 /**
- * TrafficEngine manages vehicle state for traffic visualization.
+ * TrafficEngine manages road traffic simulation.
+ *
+ * Features:
+ * - Spawns vehicles per time slice based on segment spawnRates
+ * - Moves vehicles along segments using avgSpeed
+ * - Removes vehicles when they complete their segment
+ * - Object pooling for performance
+ * - DEFENSIVE COPYING: getVehicles() returns copies, not references
  *
  * Usage:
  * ```ts
- * const engine = new TrafficEngine(roadSegments, 2000);
+ * const engine = new TrafficEngine(segments, 2000);
  *
  * // In render loop:
- * engine.update(simulationTime, deltaTime);
- * const vehicles = engine.getVehicles();
- * // Update InstancedMesh with vehicles
+ * engine.update(simulationTime, deltaSeconds);
+ * const vehicles = engine.getVehicles(); // Safe to mutate
  * ```
  */
 export class TrafficEngine {
   private segments: RoadSegment[];
   private segmentLengths: Map<string, number>;
   private maxVehicles: number;
-
-  /** Object pool of vehicles */
-  private pool: PooledVehicle[];
-
-  /** Current count of active vehicles */
+  private vehicles: PooledVehicle[];
   private activeCount: number;
-
-  /** Last slice index we spawned for */
   private lastSliceIndex: number;
-
-  /** Counter for generating unique vehicle IDs */
   private nextVehicleId: number;
 
   /**
    * Creates a new TrafficEngine.
    *
    * @param segments - Array of road segment definitions
-   * @param maxVehicles - Maximum number of simultaneous vehicles
+   * @param maxVehicles - Maximum concurrent vehicles (for pooling)
    */
   constructor(segments: RoadSegment[], maxVehicles: number) {
     this.segments = segments;
     this.maxVehicles = maxVehicles;
-    this.pool = [];
+    this.vehicles = [];
     this.activeCount = 0;
-    this.lastSliceIndex = -1; // -1 means uninitialized
+    this.lastSliceIndex = -1; // -1 means no slice processed yet
     this.nextVehicleId = 0;
 
-    // Pre-calculate segment lengths
+    // Pre-compute segment lengths
     this.segmentLengths = new Map();
     for (const segment of segments) {
       this.segmentLengths.set(segment.id, getPolylineLength(segment.points));
@@ -119,48 +130,59 @@ export class TrafficEngine {
   }
 
   /**
-   * Update the traffic simulation.
+   * Update the simulation state.
    *
-   * @param simulationTime - Current simulation time [0, 1)
-   * @param dt - Delta time in seconds since last update
+   * Order of operations:
+   * 1. Move existing vehicles (based on dt)
+   * 2. Remove vehicles that completed their segment
+   * 3. Spawn new vehicles (they start at segment beginning, move next frame)
+   *
+   * This order ensures newly spawned vehicles appear at segment start
+   * and don't move until the next frame.
+   *
+   * @param t - Current simulation time [0, 1)
+   * @param dt - Delta time in seconds since last frame
    */
-  update(simulationTime: number, dt: number): void {
-    const currentSlice = getSliceIndex(simulationTime);
+  update(t: number, dt: number): void {
+    // 1. Move existing vehicles first
+    this.moveVehicles(dt);
 
-    // Handle slice transitions - spawn new vehicles
+    // 2. Remove vehicles that completed their segment
+    this.removeCompletedVehicles();
+
+    // 3. Spawn new vehicles on slice transition (they wait until next frame)
+    const currentSlice = getSliceIndex(t);
     if (currentSlice !== this.lastSliceIndex) {
-      this.spawnForSlice(currentSlice);
+      this.spawnVehiclesForSlice(currentSlice);
       this.lastSliceIndex = currentSlice;
     }
-
-    // Move existing vehicles (only if dt > 0)
-    if (dt > 0) {
-      this.moveVehicles(dt);
-    }
-
-    // Remove completed vehicles
-    this.removeCompletedVehicles();
   }
 
   /**
-   * Get current active vehicles for rendering.
+   * Get all active vehicles with DEFENSIVE COPIES of position arrays.
    *
-   * @returns Array of active vehicle states
+   * IMPORTANT: Each call returns NEW position array instances.
+   * Callers can safely mutate the returned arrays without affecting
+   * the engine's internal state.
+   *
+   * @returns Array of VehicleState objects
    */
   getVehicles(): VehicleState[] {
     const result: VehicleState[] = [];
-    for (const vehicle of this.pool) {
-      if (vehicle.active) {
-        result.push({
-          id: vehicle.id,
-          segmentId: vehicle.segmentId,
-          position: vehicle.position,
-          progress: vehicle.progress,
-          congestion: vehicle.congestion,
-          speedMps: vehicle.speedMps,
-        });
-      }
+
+    for (const vehicle of this.vehicles) {
+      if (!vehicle.active) continue;
+
+      result.push({
+        id: vehicle.id,
+        segmentId: vehicle.segment.id,
+        // DEFENSIVE COPY: Create new array to prevent external mutation
+        position: [...vehicle.position] as Point3D,
+        progress: vehicle.progress,
+        congestion: vehicle.segment.congestionFactor,
+      });
     }
+
     return result;
   }
 
@@ -176,20 +198,19 @@ export class TrafficEngine {
   // ===========================================================================
 
   /**
-   * Spawn vehicles for entering a new time slice.
+   * Spawn vehicles for all segments based on the current slice's spawn rates.
    */
-  private spawnForSlice(sliceIndex: number): void {
+  private spawnVehiclesForSlice(sliceIndex: number): void {
     for (const segment of this.segments) {
-      // Get spawn count for this slice
       const spawnCount = segment.spawnRates[sliceIndex] ?? 0;
+      const segmentLength = this.segmentLengths.get(segment.id) ?? 0;
 
       for (let i = 0; i < spawnCount; i++) {
-        // Check max limit
         if (this.activeCount >= this.maxVehicles) {
-          return;
+          return; // Hit capacity
         }
 
-        this.spawnVehicle(segment);
+        this.spawnVehicle(segment, segmentLength);
       }
     }
   }
@@ -197,37 +218,39 @@ export class TrafficEngine {
   /**
    * Spawn a single vehicle on a segment.
    */
-  private spawnVehicle(segment: RoadSegment): void {
-    const segmentLength = this.segmentLengths.get(segment.id) ?? 0;
+  private spawnVehicle(segment: RoadSegment, segmentLength: number): void {
+    // Calculate speed in meters per second
     const speedMps = segment.avgSpeedMph * MPH_TO_MPS;
+
+    // Get starting position
     const startPosition = interpolatePolyline(segment.points, 0);
 
-    // Try to reuse a pooled vehicle
-    let vehicle = this.getPooledVehicle();
+    // Try to reuse an inactive pooled vehicle
+    let vehicle = this.findInactiveVehicle();
 
     if (vehicle) {
       // Reuse pooled vehicle
       vehicle.id = `v${this.nextVehicleId++}`;
-      vehicle.segmentId = segment.id;
-      vehicle.position = startPosition;
-      vehicle.progress = 0;
-      vehicle.congestion = segment.congestionFactor;
-      vehicle.speedMps = speedMps;
-      vehicle.active = true;
+      vehicle.segment = segment;
       vehicle.segmentLength = segmentLength;
+      vehicle.progress = 0;
+      vehicle.speedMps = speedMps;
+      vehicle.position[0] = startPosition[0];
+      vehicle.position[1] = startPosition[1];
+      vehicle.position[2] = startPosition[2];
+      vehicle.active = true;
     } else {
-      // Create new vehicle
+      // Create new pooled vehicle
       vehicle = {
         id: `v${this.nextVehicleId++}`,
-        segmentId: segment.id,
-        position: startPosition,
+        segment,
+        segmentLength,
         progress: 0,
-        congestion: segment.congestionFactor,
-        speedMps: speedMps,
+        speedMps,
+        position: startPosition, // interpolatePolyline returns a new array
         active: true,
-        segmentLength: segmentLength,
       };
-      this.pool.push(vehicle);
+      this.vehicles.push(vehicle);
     }
 
     this.activeCount++;
@@ -236,48 +259,50 @@ export class TrafficEngine {
   /**
    * Find an inactive vehicle in the pool for reuse.
    */
-  private getPooledVehicle(): PooledVehicle | null {
-    for (const vehicle of this.pool) {
-      if (!vehicle.active) {
-        return vehicle;
-      }
-    }
-    return null;
+  private findInactiveVehicle(): PooledVehicle | undefined {
+    return this.vehicles.find((v) => !v.active);
   }
 
   /**
    * Move all active vehicles based on their speed and delta time.
    */
   private moveVehicles(dt: number): void {
-    for (const vehicle of this.pool) {
+    for (const vehicle of this.vehicles) {
       if (!vehicle.active) continue;
 
-      // Calculate progress delta
-      // progress = distance / segmentLength
-      // distance = speed * dt
-      const segmentLength = vehicle.segmentLength;
-      if (segmentLength <= 0) continue;
-
-      const distanceTraveled = vehicle.speedMps * dt;
-      const progressDelta = distanceTraveled / segmentLength;
-
-      vehicle.progress += progressDelta;
-
-      // Update position if still active
-      if (vehicle.progress < 1) {
-        const segment = this.segments.find((s) => s.id === vehicle.segmentId);
-        if (segment) {
-          vehicle.position = interpolatePolyline(segment.points, vehicle.progress);
-        }
+      // Skip if segment has no length (avoid division by zero)
+      if (vehicle.segmentLength <= 0) {
+        vehicle.progress = 1; // Mark as complete
+        continue;
       }
+
+      // Calculate distance traveled this frame
+      const distanceTraveled = vehicle.speedMps * dt;
+
+      // Convert to progress delta
+      const progressDelta = distanceTraveled / vehicle.segmentLength;
+
+      // Update progress
+      vehicle.progress = Math.min(1, vehicle.progress + progressDelta);
+
+      // Update position via interpolation
+      const newPosition = interpolatePolyline(
+        vehicle.segment.points,
+        vehicle.progress
+      );
+
+      // Update internal position array (no allocation in hot path)
+      vehicle.position[0] = newPosition[0];
+      vehicle.position[1] = newPosition[1];
+      vehicle.position[2] = newPosition[2];
     }
   }
 
   /**
-   * Remove vehicles that have completed their segment.
+   * Remove vehicles that have completed their segment (progress >= 1).
    */
   private removeCompletedVehicles(): void {
-    for (const vehicle of this.pool) {
+    for (const vehicle of this.vehicles) {
       if (vehicle.active && vehicle.progress >= 1) {
         vehicle.active = false;
         this.activeCount--;

@@ -21,11 +21,11 @@ import { useData } from '../hooks/useDataLoader';
 /** Maximum number of train instances */
 export const MAX_TRAINS = 300;
 
-/** Train geometry dimensions (meters) */
+/** Train geometry dimensions (meters) - sphere for direction-independent display */
 export const TRAIN_SIZE = {
-  width: 3,
-  height: 3,
-  length: 20,
+  radius: 6,
+  widthSegments: 12,
+  heightSegments: 8,
 };
 
 /** Y offset for trains (should be at subway depth, but position from engine already includes it) */
@@ -113,13 +113,13 @@ export function Trains({ maxTrains = MAX_TRAINS }: TrainsProps) {
   // Get train schedules and subway lines from data context
   const { data } = useData();
 
-  // Create geometry once
+  // Create geometry once - sphere for direction-independent display
   const geometry = useMemo(
     () =>
-      new THREE.BoxGeometry(
-        TRAIN_SIZE.width,
-        TRAIN_SIZE.height,
-        TRAIN_SIZE.length
+      new THREE.SphereGeometry(
+        TRAIN_SIZE.radius,
+        TRAIN_SIZE.widthSegments,
+        TRAIN_SIZE.heightSegments
       ),
     []
   );

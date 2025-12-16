@@ -36,3 +36,4 @@ yarn-error.log*
 # Data processing cache files
 scripts/*_raw.geojson
 scripts/*_cache.json
+*.zip

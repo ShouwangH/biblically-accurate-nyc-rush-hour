@@ -139,6 +139,45 @@ describe('toWGS84', () => {
   });
 });
 
+describe('ground bounds alignment', () => {
+  /**
+   * These tests verify the coordinate conversion for the ground plane bounds.
+   * The ground plane covers lower Manhattan with a small buffer:
+   * - WGS84: lat [40.698, 40.758], lng [-74.025, -73.965]
+   * - Local: X ~[-675, 4388], Z ~[590, -6089]
+   */
+
+  it('converts southwest corner (40.698, -74.025) to expected local coords', () => {
+    const [x, , z] = toLocalCoords(40.698, -74.025, 0);
+    // x: west of origin = negative
+    expect(x).toBeCloseTo(-675, 0);
+    // z: south of origin = positive
+    expect(z).toBeCloseTo(590, 0);
+  });
+
+  it('converts northeast corner (40.758, -73.965) to expected local coords', () => {
+    const [x, , z] = toLocalCoords(40.758, -73.965, 0);
+    // x: east of origin = positive
+    expect(x).toBeCloseTo(4388, 0);
+    // z: north of origin = negative
+    expect(z).toBeCloseTo(-6089, 0);
+  });
+
+  it('ground bounds cover approximately 5km x 6.7km', () => {
+    const [xWest, , zSouth] = toLocalCoords(40.698, -74.025, 0);
+    const [xEast, , zNorth] = toLocalCoords(40.758, -73.965, 0);
+
+    const width = xEast - xWest;
+    const depth = zSouth - zNorth; // zSouth > zNorth because south = positive Z
+
+    // Verify dimensions are in expected range for lower Manhattan
+    expect(width).toBeGreaterThan(5000);
+    expect(width).toBeLessThan(5200);
+    expect(depth).toBeGreaterThan(6600);
+    expect(depth).toBeLessThan(6800);
+  });
+});
+
 describe('round-trip conversion', () => {
   it('toLocalCoords → toWGS84 returns original coordinates', () => {
     const testCases = [
@@ -148,7 +187,8 @@ describe('round-trip conversion', () => {
       [40.7527, -73.9772, 5], // Grand Central area
     ];
 
-    for (const [lat, lng, elev] of testCases) {
+    for (const testCase of testCases) {
+      const [lat, lng, elev] = testCase as [number, number, number];
       const [x, y, z] = toLocalCoords(lat, lng, elev);
       const [lat2, lng2, elev2] = toWGS84(x, y, z);
 
@@ -166,7 +206,8 @@ describe('round-trip conversion', () => {
       [3389, 0, -5397], // Grand Central local coords
     ];
 
-    for (const [x, y, z] of testCases) {
+    for (const testCase of testCases) {
+      const [x, y, z] = testCase as [number, number, number];
       const [lat, lng, elev] = toWGS84(x, y, z);
       const [x2, y2, z2] = toLocalCoords(lat, lng, elev);
 

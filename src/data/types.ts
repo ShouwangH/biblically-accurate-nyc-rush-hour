@@ -224,6 +224,51 @@ export interface RoadSegmentsFile {
 }
 
 // =============================================================================
+// Ground Layer (ground plane bounds)
+// =============================================================================
+
+/**
+ * Geographic bounds in WGS84 coordinates.
+ */
+export interface WGS84Bounds {
+  /** Western edge longitude */
+  west: number;
+  /** Eastern edge longitude */
+  east: number;
+  /** Southern edge latitude */
+  south: number;
+  /** Northern edge latitude */
+  north: number;
+}
+
+/**
+ * Bounds in local coordinate system (meters from origin).
+ * X-axis: positive = east
+ * Z-axis: negative = north, positive = south
+ */
+export interface LocalBounds {
+  /** Minimum X (western edge) */
+  xMin: number;
+  /** Maximum X (eastern edge) */
+  xMax: number;
+  /** Minimum Z (northern edge, more negative = further north) */
+  zMin: number;
+  /** Maximum Z (southern edge) */
+  zMax: number;
+}
+
+/**
+ * Complete ground bounds definition with both coordinate systems.
+ * Used by GroundPlane component to position and size the ground mesh.
+ */
+export interface GroundBounds {
+  /** Bounds in WGS84 (for reference/GIS alignment) */
+  wgs84: WGS84Bounds;
+  /** Bounds in local coordinates (for 3D rendering) */
+  local: LocalBounds;
+}
+
+// =============================================================================
 // Aggregated Data (for DataProvider context)
 // =============================================================================
 

@@ -426,6 +426,13 @@ export function CameraController({
       minDistance={100}
       maxDistance={10000}
       maxPolarAngle={Math.PI / 2.1}
+      // Explicit mouse button mapping:
+      // Left = rotate, Middle = dolly/zoom, Right = pan
+      mouseButtons={{
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN,
+      }}
     />
   );
 }

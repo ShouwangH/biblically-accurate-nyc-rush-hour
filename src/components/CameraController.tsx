@@ -426,8 +426,9 @@ export function CameraController({
       minDistance={100}
       maxDistance={10000}
       maxPolarAngle={Math.PI / 2.1}
-      // Explicit mouse button mapping:
-      // Left = rotate, Middle = dolly/zoom, Right = pan
+      // screenSpacePanning=false makes pan move in horizontal (XZ) plane
+      // This feels more like moving across a map rather than screen-space shifting
+      screenSpacePanning={false}
       mouseButtons={{
         LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.DOLLY,

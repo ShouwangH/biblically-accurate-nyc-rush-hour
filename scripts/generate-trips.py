@@ -200,17 +200,29 @@ def load_gtfs_data() -> Dict[str, Any]:
     return data
 
 
-def load_line_colors() -> Dict[str, str]:
-    """Load line colors from subway_lines.json."""
+def load_line_info() -> Tuple[Dict[str, str], Dict[str, float]]:
+    """
+    Load line colors and depths from subway_lines.json.
+
+    Returns:
+        Tuple of (colors dict, depths dict) mapping line_id to color/depth.
+    """
     colors = {}
+    depths = {}
     try:
         with open(CONFIG["subway_lines_path"], "r") as f:
             data = json.load(f)
         for line in data.get("lines", []):
-            colors[line["id"]] = line.get("color", "#808080")
+            line_id = line["id"]
+            colors[line_id] = line.get("color", "#808080")
+            # Extract depth from first segment's first point Y coordinate
+            if line.get("segments") and line["segments"][0].get("points"):
+                depths[line_id] = line["segments"][0]["points"][0][1]
+            else:
+                depths[line_id] = CONFIG["train_depth"]  # fallback
     except Exception as e:
-        print(f"  Warning: Could not load line colors: {e}")
-    return colors
+        print(f"  Warning: Could not load line info: {e}")
+    return colors, depths
 
 
 # =============================================================================
@@ -371,7 +383,11 @@ def is_time_in_window(time_str: str) -> bool:
 # Trip Processing
 # =============================================================================
 
-def process_trips(gtfs_data: Dict[str, Any], line_colors: Dict[str, str]) -> List[Dict[str, Any]]:
+def process_trips(
+    gtfs_data: Dict[str, Any],
+    line_colors: Dict[str, str],
+    line_depths: Dict[str, float]
+) -> List[Dict[str, Any]]:
     """Process GTFS data into trip objects."""
     trips = []
     stats = {
@@ -413,10 +429,13 @@ def process_trips(gtfs_data: Dict[str, Any], line_colors: Dict[str, str]) -> Lis
             stats["skipped_out_of_window"] += 1
             continue
 
-        # Convert shape to local coordinates
+        # Get line-specific depth (use fallback if not found)
+        train_depth = line_depths.get(line_id, CONFIG["train_depth"])
+
+        # Convert shape to local coordinates with correct depth
         shape_points = gtfs_data["shapes"][shape_id]
         polyline = [
-            to_local_coords(pt["lat"], pt["lon"], CONFIG["train_depth"])
+            to_local_coords(pt["lat"], pt["lon"], train_depth)
             for pt in shape_points
         ]
 
@@ -440,8 +459,8 @@ def process_trips(gtfs_data: Dict[str, Any], line_colors: Dict[str, str]) -> Lis
             if t is None:
                 continue
 
-            # Convert stop position to local coords
-            pos = to_local_coords(stop_info["lat"], stop_info["lon"], CONFIG["train_depth"])
+            # Convert stop position to local coords (using line-specific depth)
+            pos = to_local_coords(stop_info["lat"], stop_info["lon"], train_depth)
 
             # Find distance along original polyline
             dist = distance_along_polyline(polyline, pos)
@@ -570,10 +589,11 @@ def main() -> int:
     print(f"Time window: {CONFIG['start_hour']}:00 - {CONFIG['end_hour']}:00")
     print(f"Viewport: X=[{VIEWPORT['minX']}, {VIEWPORT['maxX']}], Z=[{VIEWPORT['minZ']}, {VIEWPORT['maxZ']}]")
 
-    # Load line colors
-    print("\nLoading line colors...")
-    line_colors = load_line_colors()
+    # Load line colors and depths
+    print("\nLoading line info...")
+    line_colors, line_depths = load_line_info()
     print(f"  Loaded colors for {len(line_colors)} lines")
+    print(f"  Loaded depths for {len(line_depths)} lines")
 
     # Load GTFS data
     print("\nLoading GTFS data...")
@@ -581,7 +601,7 @@ def main() -> int:
 
     # Process trips
     print("\nProcessing trips...")
-    trips = process_trips(gtfs_data, line_colors)
+    trips = process_trips(gtfs_data, line_colors, line_depths)
 
     print(f"\nTotal trips generated: {len(trips)}")
 

@@ -23,6 +23,7 @@ import type {
   TrainSchedulesFile,
   RoadSegmentsFile,
   TripsFile,
+  RoadbedsFile,
 } from '../data/types';
 
 // =============================================================================
@@ -85,6 +86,7 @@ const ASSET_PATHS = {
   trainSchedules: '/assets/train_schedules.json',
   roadSegments: '/assets/road_segments.json',
   trips: '/assets/trips.json',
+  roadbeds: '/assets/roadbeds.json',
 } as const;
 
 // =============================================================================
@@ -131,8 +133,14 @@ async function loadAllData(): Promise<SimulationData> {
     ? fetchJson<TripsFile>(ASSET_PATHS.trips, 'trips.json')
     : Promise.resolve(undefined);
 
-  const [stations, subwayLines, trainSchedules, roadSegments, trips] =
-    await Promise.all([...basePromises, tripsPromise]);
+  // Load roadbeds (optional - don't fail if missing)
+  const roadbedsPromise = fetchJson<RoadbedsFile>(
+    ASSET_PATHS.roadbeds,
+    'roadbeds.json'
+  ).catch(() => undefined);
+
+  const [stations, subwayLines, trainSchedules, roadSegments, trips, roadbeds] =
+    await Promise.all([...basePromises, tripsPromise, roadbedsPromise]);
 
   return {
     stations,
@@ -140,6 +148,7 @@ async function loadAllData(): Promise<SimulationData> {
     trainSchedules,
     roadSegments,
     trips,
+    roadbeds,
   };
 }
 

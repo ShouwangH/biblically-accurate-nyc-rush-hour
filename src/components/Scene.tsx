@@ -5,12 +5,10 @@
  * Sets up:
  * - WebGL canvas with appropriate settings
  * - Camera configuration for city-scale viewing
- * - Orbit controls for interactive exploration
  * - Environment (lights, fog, background)
  */
 import { Canvas } from '@react-three/fiber';
 import { Environment } from './Environment';
-import { CameraController } from './CameraController';
 
 // =============================================================================
 // Camera Configuration
@@ -62,9 +60,6 @@ export function Scene({ children }: SceneProps) {
     >
       {/* Scene environment (lights, fog, background) */}
       <Environment />
-
-      {/* Camera controller (auto/manual modes with keyframe animation) */}
-      <CameraController />
 
       {/* Child components (buildings, trains, etc.) */}
       {children}

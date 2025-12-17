@@ -196,13 +196,14 @@ describe('DataProvider', () => {
         expect(result.current.data).not.toBeNull();
       });
 
-      // Verify fetch was called 5 times (4 base + trips when USE_TRIP_ENGINE is true)
-      expect(fetch).toHaveBeenCalledTimes(5);
+      // Verify fetch was called 6 times (4 base + trips + roadbeds)
+      expect(fetch).toHaveBeenCalledTimes(6);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('stations'));
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('subway_lines'));
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('train_schedules'));
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('road_segments'));
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('trips'));
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('roadbeds'));
     });
 
     it('provides correctly typed trip data', async () => {

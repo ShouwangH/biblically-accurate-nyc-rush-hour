@@ -15,7 +15,11 @@
  */
 import type { RoadSegment, Point3D } from '../data/types';
 import { getSliceIndex } from '../utils/sliceIndex';
-import { interpolatePolyline, getPolylineLength } from '../utils/interpolation';
+import {
+  interpolatePolyline,
+  getPolylineLength,
+  getPolylineHeading,
+} from '../utils/interpolation';
 
 // =============================================================================
 // Types
@@ -43,6 +47,9 @@ export interface VehicleState {
 
   /** Speed in meters per second */
   speedMps: number;
+
+  /** Heading angle in radians (rotation around Y axis, 0 = +Z direction) */
+  heading: number;
 }
 
 /**
@@ -176,6 +183,9 @@ export class TrafficEngine {
     for (const vehicle of this.vehicles) {
       if (!vehicle.active) continue;
 
+      // Compute heading from segment direction at current progress
+      const heading = getPolylineHeading(vehicle.segment.points, vehicle.progress);
+
       result.push({
         id: vehicle.id,
         segmentId: vehicle.segment.id,
@@ -184,6 +194,7 @@ export class TrafficEngine {
         progress: vehicle.progress,
         congestion: vehicle.segment.congestionFactor,
         speedMps: vehicle.speedMps,
+        heading,
       });
     }
 
@@ -195,6 +206,24 @@ export class TrafficEngine {
    */
   getVehicleCount(): number {
     return this.activeCount;
+  }
+
+  /**
+   * Reset the engine state.
+   *
+   * Used when scrubbing backwards in time or jumping to a new time.
+   * Clears all vehicles and resets slice tracking so spawning resumes
+   * correctly from the new time position.
+   */
+  reset(): void {
+    // Deactivate all vehicles (return to pool)
+    for (const vehicle of this.vehicles) {
+      vehicle.active = false;
+    }
+    this.activeCount = 0;
+
+    // Reset slice tracking so next update will spawn fresh vehicles
+    this.lastSliceIndex = -1;
   }
 
   // ===========================================================================

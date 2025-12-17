@@ -448,6 +448,7 @@ describe('VehicleState type', () => {
       progress: 0.5,
       congestion: 0.5,
       speedMps: 4.47,
+      heading: 0,
     };
     expect(vehicle).toBeDefined();
   });

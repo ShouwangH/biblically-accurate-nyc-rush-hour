@@ -97,11 +97,6 @@ describe('Scene', () => {
     expect(camera.far).toBeGreaterThan(5000);
   });
 
-  it('includes CameraController for camera interaction', () => {
-    render(<Scene />);
-    expect(screen.getByTestId('camera-controller')).toBeInTheDocument();
-  });
-
   it('renders children inside Canvas', () => {
     render(
       <Scene>

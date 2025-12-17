@@ -64,7 +64,7 @@ describe('Overlay', () => {
   });
 
   describe('styling', () => {
-    it('positions overlay in corner', () => {
+    it('positions overlay absolutely', () => {
       render(<Overlay />);
       const overlay = screen.getByTestId('overlay');
       const style = window.getComputedStyle(overlay);

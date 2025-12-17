@@ -1,0 +1,16 @@
+{
+  "wgs84Bounds": {
+    "west": -74.025,
+    "east": -73.965,
+    "south": 40.698,
+    "north": 40.758
+  },
+  "localBounds": {
+    "xMin": -700,
+    "xMax": 4400,
+    "zMin": -6200,
+    "zMax": 600
+  },
+  "resolution": [4096, 4096],
+  "generatedAt": "2025-XX-XX"
+}

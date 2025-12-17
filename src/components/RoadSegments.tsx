@@ -14,6 +14,13 @@ import { useData } from '../hooks/useDataLoader';
 // Constants
 // =============================================================================
 
+/**
+ * Debug toggle: Set to true to show road segment lines.
+ * Hidden by default since ground plane texture includes stylized roads.
+ * Useful for debugging traffic vehicle paths.
+ */
+const DEBUG_SHOW_ROAD_SEGMENTS = false;
+
 /** Road line styling */
 const ROAD_STYLE = {
   /** Line color - subtle gray */
@@ -44,6 +51,11 @@ const ROAD_STYLE = {
  * ```
  */
 export function RoadSegments() {
+  // Early return if debug mode is disabled
+  if (!DEBUG_SHOW_ROAD_SEGMENTS) {
+    return null;
+  }
+
   const { data } = useData();
 
   // Build line geometry from all road segments

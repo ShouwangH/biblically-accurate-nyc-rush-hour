@@ -1,0 +1,21 @@
+{
+  "totalSegments": 4785,
+  "totalNodes": 3245,
+  "componentCount": 820,
+  "largestComponentSize": 620,
+  "largestComponentPct": 12.96,
+  "reachableFromEntries": 4785,
+  "reachableFromEntriesPct": 100.0,
+  "interiorDeadEnds": 921,
+  "interiorDeadEndPct": 19.25,
+  "boundaryDeadEnds": 94,
+  "entryPointCount": 1028,
+  "majorSegmentCount": 739,
+  "avgSuccessors": 0.91,
+  "avgPredecessors": 0.91,
+  "passed": false,
+  "failures": [
+    "Largest component 13.0% < 90.0% threshold",
+    "Interior dead ends 19.2% > 5.0% threshold"
+  ]
+}

@@ -22,7 +22,19 @@ import type {
   SubwayLinesFile,
   TrainSchedulesFile,
   RoadSegmentsFile,
+  TripsFile,
 } from '../data/types';
+
+// =============================================================================
+// Feature Flags
+// =============================================================================
+
+/**
+ * Feature flag to enable the trip-based train engine.
+ * When true, loads trips.json and Trains.tsx uses TripEngine.
+ * When false, uses the legacy segment-based TrainEngine.
+ */
+export const USE_TRIP_ENGINE = true;
 
 // =============================================================================
 // Error Type
@@ -72,6 +84,7 @@ const ASSET_PATHS = {
   subwayLines: '/assets/subway_lines.json',
   trainSchedules: '/assets/train_schedules.json',
   roadSegments: '/assets/road_segments.json',
+  trips: '/assets/trips.json',
 } as const;
 
 // =============================================================================
@@ -96,27 +109,37 @@ async function fetchJson<T>(path: string, fileName: string): Promise<T> {
 
 /**
  * Loads all simulation data files in parallel.
+ * Conditionally loads trips.json when USE_TRIP_ENGINE is enabled.
  */
 async function loadAllData(): Promise<SimulationData> {
-  const [stations, subwayLines, trainSchedules, roadSegments] =
-    await Promise.all([
-      fetchJson<StationsFile>(ASSET_PATHS.stations, 'stations.json'),
-      fetchJson<SubwayLinesFile>(ASSET_PATHS.subwayLines, 'subway_lines.json'),
-      fetchJson<TrainSchedulesFile>(
-        ASSET_PATHS.trainSchedules,
-        'train_schedules.json'
-      ),
-      fetchJson<RoadSegmentsFile>(
-        ASSET_PATHS.roadSegments,
-        'road_segments.json'
-      ),
-    ]);
+  // Base data that's always loaded
+  const basePromises = [
+    fetchJson<StationsFile>(ASSET_PATHS.stations, 'stations.json'),
+    fetchJson<SubwayLinesFile>(ASSET_PATHS.subwayLines, 'subway_lines.json'),
+    fetchJson<TrainSchedulesFile>(
+      ASSET_PATHS.trainSchedules,
+      'train_schedules.json'
+    ),
+    fetchJson<RoadSegmentsFile>(
+      ASSET_PATHS.roadSegments,
+      'road_segments.json'
+    ),
+  ] as const;
+
+  // Conditionally load trips.json for trip-based engine
+  const tripsPromise = USE_TRIP_ENGINE
+    ? fetchJson<TripsFile>(ASSET_PATHS.trips, 'trips.json')
+    : Promise.resolve(undefined);
+
+  const [stations, subwayLines, trainSchedules, roadSegments, trips] =
+    await Promise.all([...basePromises, tripsPromise]);
 
   return {
     stations,
     subwayLines,
     trainSchedules,
     roadSegments,
+    trips,
   };
 }
 

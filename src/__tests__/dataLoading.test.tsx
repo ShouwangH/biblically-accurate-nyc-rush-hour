@@ -74,6 +74,31 @@ const mockRoadSegments = {
   ],
 };
 
+const mockTrips = {
+  meta: {
+    source: 'GTFS static',
+    generated: '2025-01-01T00:00:00Z',
+    timeWindow: '08:00-09:00',
+    viewport: { minX: 0, maxX: 1000, minZ: -1000, maxZ: 0 },
+  },
+  trips: [
+    {
+      id: 'trip-1',
+      lineId: 'A',
+      direction: 1,
+      color: '#0039A6',
+      stops: [
+        { stopId: 's1', stationName: 'Start', arrivalTime: 0, position: [0, -15, 0], distanceAlongRoute: 0 },
+        { stopId: 's2', stationName: 'End', arrivalTime: 0.5, position: [100, -15, 0], distanceAlongRoute: 100 },
+      ],
+      polyline: [[0, -15, 0], [100, -15, 0]],
+      totalLength: 100,
+      tEnter: 0,
+      tExit: 0.5,
+    },
+  ],
+};
+
 // Helper to create wrapper
 function createWrapper() {
   return function Wrapper({ children }: { children: React.ReactNode }) {
@@ -108,6 +133,12 @@ describe('DataProvider', () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve(mockRoadSegments),
+        });
+      }
+      if (url.includes('trips')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockTrips),
         });
       }
       return Promise.reject(new Error(`Unknown URL: ${url}`));
@@ -156,7 +187,7 @@ describe('DataProvider', () => {
       expect(result.current.data?.roadSegments).toBeDefined();
     });
 
-    it('loads all four data files', async () => {
+    it('loads all data files including trips', async () => {
       const { result } = renderHook(() => useData(), {
         wrapper: createWrapper(),
       });
@@ -165,12 +196,29 @@ describe('DataProvider', () => {
         expect(result.current.data).not.toBeNull();
       });
 
-      // Verify fetch was called 4 times (one for each data file)
-      expect(fetch).toHaveBeenCalledTimes(4);
+      // Verify fetch was called 5 times (4 base + trips when USE_TRIP_ENGINE is true)
+      expect(fetch).toHaveBeenCalledTimes(5);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('stations'));
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('subway_lines'));
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('train_schedules'));
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('road_segments'));
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('trips'));
+    });
+
+    it('provides correctly typed trip data', async () => {
+      const { result } = renderHook(() => useData(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.data).not.toBeNull();
+      });
+
+      const trips = result.current.data!.trips;
+      expect(trips).toBeDefined();
+      expect(trips!.meta.source).toBe('GTFS static');
+      expect(trips!.trips[0]!.id).toBe('trip-1');
+      expect(trips!.trips[0]!.stops).toHaveLength(2);
     });
 
     it('provides correctly typed station data', async () => {

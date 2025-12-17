@@ -370,4 +370,6 @@ export interface SimulationData {
   subwayLines: SubwayLinesFile;
   trainSchedules: TrainSchedulesFile;
   roadSegments: RoadSegmentsFile;
+  /** Trip data for trip-based train engine (optional, loaded when USE_TRIP_ENGINE is true) */
+  trips?: TripsFile;
 }

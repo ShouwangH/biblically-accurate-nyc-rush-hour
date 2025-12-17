@@ -511,6 +511,35 @@ export interface RouteCacheFile {
  * All simulation data loaded by DataProvider.
  * Buildings are loaded separately via useGLTF.
  */
+// =============================================================================
+// Roadbeds (roadbeds.json)
+// =============================================================================
+
+/** A roadbed polygon */
+export interface Roadbed {
+  /** Unique identifier */
+  id: string;
+  /** Polygon points as [x, z] tuples (local coordinates) */
+  points: [number, number][];
+}
+
+/** Metadata for roadbeds file */
+export interface RoadbedsMeta {
+  source: string;
+  url: string;
+  count: number;
+}
+
+/** Root structure for roadbeds.json */
+export interface RoadbedsFile {
+  meta: RoadbedsMeta;
+  roadbeds: Roadbed[];
+}
+
+// =============================================================================
+// Simulation Data (combined)
+// =============================================================================
+
 export interface SimulationData {
   stations: StationsFile;
   subwayLines: SubwayLinesFile;
@@ -520,4 +549,6 @@ export interface SimulationData {
   trips?: TripsFile;
   /** Route cache for pseudo-trip traffic (optional) */
   routeCache?: RouteCacheFile;
+  /** Roadbed polygons (optional) */
+  roadbeds?: RoadbedsFile;
 }

@@ -2,10 +2,13 @@
  * Traffic Component
  *
  * Renders road traffic as instanced particles using TrafficEngine.
- * Vehicles flow along road segments with color based on congestion.
+ * Vehicles flow along road segments.
  *
  * Per CLAUDE.md §8.3: Component only renders; TrafficEngine owns state.
  * Per CLAUDE.md §8.6: Uses InstancedMesh with pre-allocated temp objects.
+ *
+ * Note: Instance colors are disabled due to WebGL buffer sync issues
+ * causing black screen. Using fixed material color instead.
  */
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -21,20 +24,21 @@ import { useData } from '../hooks/useDataLoader';
 /** Maximum number of vehicle instances */
 const MAX_VEHICLES = 2000;
 
-/** Vehicle geometry dimensions (meters) */
+/**
+ * Vehicle geometry dimensions (meters)
+ * Realistic NYC taxi/sedan proportions, scaled for visibility:
+ * - Length: ~5m (typical sedan)
+ * - Width: ~2m (typical sedan)
+ * - Height: ~1.5m (typical sedan)
+ */
 const VEHICLE_SIZE = {
   width: 2,
   height: 1.5,
-  length: 4,
+  length: 5,
 };
 
-/** Color gradient for congestion: gold (uncongested) to red (congested) */
-const CONGESTION_COLORS = {
-  /** Low congestion (congestionFactor near 1) - gold/yellow */
-  low: new THREE.Color('#FFD700'),
-  /** High congestion (congestionFactor near 0) - red */
-  high: new THREE.Color('#FF4444'),
-};
+/** Vehicle color - gold/yellow for visibility */
+const VEHICLE_COLOR = '#FFD700';
 
 /** Y offset to place vehicles slightly above ground */
 const VEHICLE_Y_OFFSET = VEHICLE_SIZE.height / 2;
@@ -44,28 +48,10 @@ const VEHICLE_Y_OFFSET = VEHICLE_SIZE.height / 2;
 // =============================================================================
 
 const tempMatrix = new THREE.Matrix4();
-const tempColor = new THREE.Color();
 const tempPosition = new THREE.Vector3();
 const tempQuaternion = new THREE.Quaternion();
 const tempScale = new THREE.Vector3(1, 1, 1);
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/**
- * Maps congestion factor to color.
- * congestionFactor is avgSpeed/freeFlowSpeed, so:
- * - 1.0 = no congestion (gold)
- * - 0.0 = maximum congestion (red)
- */
-function getCongestionColor(congestionFactor: number): THREE.Color {
-  // Clamp to [0, 1]
-  const t = Math.max(0, Math.min(1, congestionFactor));
-  // Lerp from high (red) to low (gold) based on congestion
-  // Higher congestionFactor = less congested = more gold
-  return tempColor.copy(CONGESTION_COLORS.high).lerp(CONGESTION_COLORS.low, t);
-}
+const yAxis = new THREE.Vector3(0, 1, 0);
 
 // =============================================================================
 // Component
@@ -82,7 +68,6 @@ interface TrafficProps {
  * Features:
  * - Uses TrafficEngine for state computation
  * - InstancedMesh for efficient rendering of many vehicles
- * - Color gradient based on congestion (gold = free flow, red = congested)
  * - Updates per frame via useFrame hook
  *
  * Usage:
@@ -93,12 +78,20 @@ interface TrafficProps {
  * ```
  */
 export function Traffic({ maxVehicles = MAX_VEHICLES }: TrafficProps) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const meshRef = useRef<THREE.InstancedMesh | null>(null);
   const engineRef = useRef<TrafficEngine | null>(null);
   const lastTimeRef = useRef<number>(0);
 
+  // Callback ref to set initial count to 0 immediately when mesh is created
+  const setMeshRef = (mesh: THREE.InstancedMesh | null) => {
+    if (mesh) {
+      mesh.count = 0; // Hide all instances initially
+    }
+    meshRef.current = mesh;
+  };
+
   // Get simulation time from context
-  const { t } = useSimulationTime();
+  const { t, speed, isPlaying } = useSimulationTime();
 
   // Get road segments from data context
   const { data } = useData();
@@ -114,10 +107,11 @@ export function Traffic({ maxVehicles = MAX_VEHICLES }: TrafficProps) {
     []
   );
 
-  // Create material once
+  // Create material once (fixed color - instance colors disabled due to WebGL issues)
   const material = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
+        color: VEHICLE_COLOR,
         roughness: 0.6,
         metalness: 0.3,
       }),
@@ -149,8 +143,23 @@ export function Traffic({ maxVehicles = MAX_VEHICLES }: TrafficProps) {
 
     if (!engine || !mesh) return;
 
-    // Update engine with current simulation time and frame delta
-    engine.update(t, delta);
+    // Detect time scrubbing (significant backwards jump or large forward jump)
+    // Time wraps at 1.0 -> 0.0, so account for that
+    const timeDiff = t - lastTimeRef.current;
+    const isScrubbingBackward = timeDiff < -0.01 && timeDiff > -0.9; // Negative but not wrap
+    const isLargeJump = Math.abs(timeDiff) > 0.1 && Math.abs(timeDiff) < 0.9;
+
+    if (isScrubbingBackward || isLargeJump) {
+      engine.reset();
+    }
+
+    lastTimeRef.current = t;
+
+    // Scale delta by simulation speed (0 when paused)
+    const scaledDelta = isPlaying ? delta * speed : 0;
+
+    // Update engine with current simulation time and scaled delta
+    engine.update(t, scaledDelta);
 
     // Get active vehicles
     const vehicles = engine.getVehicles();
@@ -167,13 +176,12 @@ export function Traffic({ maxVehicles = MAX_VEHICLES }: TrafficProps) {
         vehicle.position[2]
       );
 
+      // Set rotation from heading (rotation around Y axis)
+      tempQuaternion.setFromAxisAngle(yAxis, vehicle.heading);
+
       // Compose transform matrix
       tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
       mesh.setMatrixAt(instanceIndex, tempMatrix);
-
-      // Set color based on congestion
-      getCongestionColor(vehicle.congestion);
-      mesh.setColorAt(instanceIndex, tempColor);
 
       instanceIndex++;
     }
@@ -181,11 +189,6 @@ export function Traffic({ maxVehicles = MAX_VEHICLES }: TrafficProps) {
     // Update instance count and flag for GPU update
     mesh.count = instanceIndex;
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true;
-    }
-
-    lastTimeRef.current = t;
   });
 
   // Don't render if no data
@@ -195,14 +198,12 @@ export function Traffic({ maxVehicles = MAX_VEHICLES }: TrafficProps) {
 
   return (
     <instancedMesh
-      ref={meshRef}
+      ref={setMeshRef}
       args={[geometry, material, maxVehicles]}
-      // Disable frustum culling to ensure all vehicles render
-      // eslint-disable-next-line react/no-unknown-property
       frustumCulled={false}
     />
   );
 }
 
 // Export constants for testing
-export { MAX_VEHICLES, VEHICLE_SIZE, CONGESTION_COLORS };
+export { MAX_VEHICLES, VEHICLE_SIZE, VEHICLE_COLOR };

@@ -24,7 +24,8 @@ export const MAX_TRAINS = 300;
 
 /** Train geometry dimensions (meters) - sphere for direction-independent display */
 export const TRAIN_SIZE = {
-  radius: 6,
+  /** Train radius - larger for visibility */
+  radius: 4,
   widthSegments: 12,
   heightSegments: 8,
 };

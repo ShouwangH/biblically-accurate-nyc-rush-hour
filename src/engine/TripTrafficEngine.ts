@@ -205,7 +205,7 @@ export class TripTrafficEngine {
     }
   }
 
-  private spawnVehicle(entrySegment: GraphRoadSegment, routes: RouteTemplate[]): void {
+  private spawnVehicle(_entrySegment: GraphRoadSegment, routes: RouteTemplate[]): void {
     const targetLength = sampleTripLength();
     const route = this.selectBestRoute(routes, targetLength);
     if (!route) return;

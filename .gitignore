@@ -36,4 +36,10 @@ yarn-error.log*
 # Data processing cache files
 scripts/*_raw.geojson
 scripts/*_cache.json
+
+# Source data (large files, not in repo)
+data/
 *.zip
+*.parquet
+*.3dm
+*.gdb

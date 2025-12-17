@@ -28,8 +28,8 @@ export function getPolylineLength(points: Point3D[]): number {
 
   let length = 0;
   for (let i = 1; i < points.length; i++) {
-    const [x1, y1, z1] = points[i - 1];
-    const [x2, y2, z2] = points[i];
+    const [x1, y1, z1] = points[i - 1]!;
+    const [x2, y2, z2] = points[i]!;
 
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -86,7 +86,7 @@ export function interpolatePolyline(points: Point3D[], progress: number): Point3
   }
 
   if (points.length === 1) {
-    return [...points[0]] as Point3D;
+    return [...points[0]!] as Point3D;
   }
 
   // Clamp progress to [0, 1]
@@ -94,11 +94,11 @@ export function interpolatePolyline(points: Point3D[], progress: number): Point3
 
   // Handle exact boundaries
   if (clampedProgress === 0) {
-    return [...points[0]] as Point3D;
+    return [...points[0]!] as Point3D;
   }
 
   if (clampedProgress === 1) {
-    return [...points[points.length - 1]] as Point3D;
+    return [...points[points.length - 1]!] as Point3D;
   }
 
   // Calculate total length and target distance
@@ -106,7 +106,7 @@ export function interpolatePolyline(points: Point3D[], progress: number): Point3
 
   // Handle zero-length polyline (all points coincident)
   if (totalLength === 0) {
-    return [...points[0]] as Point3D;
+    return [...points[0]!] as Point3D;
   }
 
   const targetDistance = clampedProgress * totalLength;
@@ -115,7 +115,7 @@ export function interpolatePolyline(points: Point3D[], progress: number): Point3
   let accumulatedLength = 0;
 
   for (let i = 1; i < points.length; i++) {
-    const segmentLength = distance(points[i - 1], points[i]);
+    const segmentLength = distance(points[i - 1]!, points[i]!);
 
     if (accumulatedLength + segmentLength >= targetDistance) {
       // Target is within this segment
@@ -123,16 +123,93 @@ export function interpolatePolyline(points: Point3D[], progress: number): Point3
 
       // Handle zero-length segments (duplicate points)
       if (segmentLength === 0) {
-        return [...points[i]] as Point3D;
+        return [...points[i]!] as Point3D;
       }
 
       const segmentProgress = remainingDistance / segmentLength;
-      return lerp(points[i - 1], points[i], segmentProgress);
+      return lerp(points[i - 1]!, points[i]!, segmentProgress);
     }
 
     accumulatedLength += segmentLength;
   }
 
   // Should not reach here, but return last point as fallback
-  return [...points[points.length - 1]] as Point3D;
+  return [...points[points.length - 1]!] as Point3D;
+}
+
+/**
+ * Get the heading angle (rotation around Y axis) at a point along a polyline.
+ *
+ * @param points - Array of 3D points defining the polyline
+ * @param progress - Value in [0, 1] representing position along the polyline
+ * @returns Heading angle in radians (0 = +Z direction, positive = clockwise when viewed from above)
+ *
+ * The heading is calculated from the direction vector of the segment
+ * containing the given progress point.
+ *
+ * @example
+ * const line = [[0, 0, 0], [100, 0, 0]]; // Points along +X axis
+ * getPolylineHeading(line, 0.5) // Returns -π/2 (facing +X = -90° from +Z)
+ */
+export function getPolylineHeading(points: Point3D[], progress: number): number {
+  // Handle edge cases
+  if (points.length < 2) {
+    return 0;
+  }
+
+  // Clamp progress to [0, 1]
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+
+  // For progress at boundaries, use the first/last segment direction
+  if (clampedProgress === 0 || clampedProgress === 1) {
+    // Use first segment for start, last segment for end
+    const segmentIndex = clampedProgress === 0 ? 0 : points.length - 2;
+    const p1 = points[segmentIndex]!;
+    const p2 = points[segmentIndex + 1]!;
+
+    const dx = p2[0] - p1[0];
+    const dz = p2[2] - p1[2];
+
+    // atan2(dx, dz) gives heading where 0 = +Z direction
+    return Math.atan2(dx, dz);
+  }
+
+  // Calculate total length and target distance
+  const totalLength = getPolylineLength(points);
+
+  // Handle zero-length polyline
+  if (totalLength === 0) {
+    return 0;
+  }
+
+  const targetDistance = clampedProgress * totalLength;
+
+  // Walk along the polyline to find the segment containing the target
+  let accumulatedLength = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const segmentLength = distance(points[i - 1]!, points[i]!);
+
+    if (accumulatedLength + segmentLength >= targetDistance) {
+      // Target is within this segment - compute heading from segment direction
+      const p1 = points[i - 1]!;
+      const p2 = points[i]!;
+
+      const dx = p2[0] - p1[0];
+      const dz = p2[2] - p1[2];
+
+      return Math.atan2(dx, dz);
+    }
+
+    accumulatedLength += segmentLength;
+  }
+
+  // Fallback: use last segment direction
+  const p1 = points[points.length - 2]!;
+  const p2 = points[points.length - 1]!;
+
+  const dx = p2[0] - p1[0];
+  const dz = p2[2] - p1[2];
+
+  return Math.atan2(dx, dz);
 }

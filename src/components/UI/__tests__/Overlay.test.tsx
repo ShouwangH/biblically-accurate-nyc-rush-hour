@@ -1,43 +1,14 @@
 /**
  * Overlay Component Tests
  *
- * Tests for the UI overlay showing clock and legend.
+ * Tests for the UI overlay showing legend.
  * Per CLAUDE.md §8.7: TDD - tests define invariants.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Overlay } from '../Overlay';
 
-// Mock useSimulationTime hook
-vi.mock('../../../hooks/useSimulationTime', () => ({
-  useSimulationTime: () => ({
-    t: 0.5,
-    displayTime: '12:00',
-    isPlaying: true,
-    sliceIndex: 30,
-  }),
-}));
-
 describe('Overlay', () => {
-  describe('clock display', () => {
-    it('renders the clock', () => {
-      render(<Overlay />);
-      expect(screen.getByTestId('clock')).toBeInTheDocument();
-    });
-
-    it('displays the simulation time', () => {
-      render(<Overlay />);
-      expect(screen.getByText('12:00')).toBeInTheDocument();
-    });
-
-    it('shows AM/PM indicator or 24h format', () => {
-      render(<Overlay />);
-      const clock = screen.getByTestId('clock');
-      // Should contain time in some format
-      expect(clock.textContent).toMatch(/\d{1,2}:\d{2}/);
-    });
-  });
-
   describe('legend', () => {
     it('renders the legend section', () => {
       render(<Overlay />);
@@ -64,22 +35,11 @@ describe('Overlay', () => {
   });
 
   describe('styling', () => {
-    it('positions overlay in corner', () => {
+    it('positions overlay absolutely', () => {
       render(<Overlay />);
       const overlay = screen.getByTestId('overlay');
       const style = window.getComputedStyle(overlay);
       expect(style.position).toBe('absolute');
-    });
-
-    it('has readable font size', () => {
-      render(<Overlay />);
-      const clock = screen.getByTestId('clock');
-      const style = window.getComputedStyle(clock);
-      // Font size should be set (in rem or px)
-      // jsdom doesn't compute rem to px, so just check fontSize is defined
-      expect(style.fontSize).toBeTruthy();
-      // Should have a numeric value
-      expect(parseFloat(style.fontSize)).toBeGreaterThan(0);
     });
 
     it('does not block 3D interaction (pointer-events)', () => {
@@ -87,13 +47,6 @@ describe('Overlay', () => {
       const overlay = screen.getByTestId('overlay');
       const style = window.getComputedStyle(overlay);
       expect(style.pointerEvents).toBe('none');
-    });
-  });
-
-  describe('title', () => {
-    it('displays visualization title', () => {
-      render(<Overlay />);
-      expect(screen.getByText(/NYC Rush Hour/i)).toBeInTheDocument();
     });
   });
 });

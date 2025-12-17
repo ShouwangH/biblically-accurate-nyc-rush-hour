@@ -20,6 +20,10 @@ import { RoadSegments } from './components/RoadSegments';
 import { Trains } from './components/Trains';
 import { StationBeams } from './components/StationBeams';
 import { Traffic } from './components/Traffic';
+import { HybridTraffic } from './components/HybridTraffic';
+
+// Feature flag: Use hybrid meso/micro traffic model instead of spawn-based
+const USE_HYBRID_TRAFFIC = true;
 import { PostProcessing } from './components/PostProcessing';
 import {
   CameraController,
@@ -88,7 +92,7 @@ export function App() {
                 {/* Animated instanced meshes */}
                 <Trains />
                 <StationBeams />
-                <Traffic />
+                {USE_HYBRID_TRAFFIC ? <HybridTraffic debug /> : <Traffic />}
 
                 {/* Post-processing effects */}
                 <PostProcessing />

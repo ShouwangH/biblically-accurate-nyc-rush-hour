@@ -1,9 +1,12 @@
 /**
  * Overlay Component
  *
- * Displays legend for the visualization.
- * Positioned in corner, doesn't block 3D interaction.
+ * Displays clock, title, and legend for the visualization.
+ * Positioned in corners, doesn't block 3D interaction.
+ *
+ * Designed for projector readability with large fonts.
  */
+import { useSimulationTime } from '../../hooks/useSimulationTime';
 
 // =============================================================================
 // Styles
@@ -19,6 +22,27 @@ const overlayStyle: React.CSSProperties = {
   fontFamily: 'system-ui, -apple-system, sans-serif',
   color: '#333',
   zIndex: 100,
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+};
+
+const titleStyle: React.CSSProperties = {
+  fontSize: '1.5rem',
+  fontWeight: 600,
+  color: '#222',
+  margin: 0,
+};
+
+const clockStyle: React.CSSProperties = {
+  fontSize: '2.5rem',
+  fontWeight: 700,
+  color: '#0039A6',
+  fontVariantNumeric: 'tabular-nums',
+  textAlign: 'right',
 };
 
 const legendContainerStyle: React.CSSProperties = {
@@ -75,7 +99,10 @@ const legendBeamStyle: React.CSSProperties = {
 // =============================================================================
 
 /**
- * Overlay displays legend explaining visual encodings.
+ * Overlay displays visualization metadata:
+ * - Title
+ * - Current simulation time (clock)
+ * - Legend explaining visual encodings
  *
  * Usage:
  * ```tsx
@@ -86,8 +113,18 @@ const legendBeamStyle: React.CSSProperties = {
  * ```
  */
 export function Overlay() {
+  const { displayTime } = useSimulationTime();
+
   return (
     <div data-testid="overlay" style={overlayStyle}>
+      {/* Header with title and clock */}
+      <div style={headerStyle}>
+        <h1 style={titleStyle}>NYC Rush Hour</h1>
+        <div data-testid="clock" style={clockStyle}>
+          {displayTime}
+        </div>
+      </div>
+
       {/* Legend */}
       <div data-testid="legend" style={legendContainerStyle}>
         <div style={legendTitleStyle}>Legend</div>

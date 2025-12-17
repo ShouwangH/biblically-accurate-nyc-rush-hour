@@ -12,6 +12,7 @@
  */
 import { Suspense } from 'react';
 import { Scene } from './components/Scene';
+import { GroundPlane } from './components/GroundPlane';
 import { Buildings } from './components/Buildings';
 import { SubwayLines } from './components/SubwayLines';
 import { RoadSegments } from './components/RoadSegments';
@@ -71,6 +72,9 @@ export function App() {
               <Scene>
                 {/* Camera control */}
                 <CameraController />
+
+                {/* Ground plane (rendered first, underneath everything) */}
+                <GroundPlane />
 
                 {/* Static geometry */}
                 <Buildings />

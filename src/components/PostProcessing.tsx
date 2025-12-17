@@ -20,9 +20,9 @@ import { BlendFunction } from 'postprocessing';
  */
 export const BLOOM_CONFIG = {
   /** Bloom intensity multiplier */
-  intensity: 1.5,
+  intensity: 0.8,
   /** Luminance threshold - pixels brighter than this bloom */
-  luminanceThreshold: 0.2,
+  luminanceThreshold: 0.3,
   /** Smoothness of the luminance threshold falloff */
   luminanceSmoothing: 0.9,
   /** Bloom radius in pixels */
@@ -79,24 +79,32 @@ export function PostProcessing({
     return null;
   }
 
-  return (
-    <EffectComposer>
-      {enableBloom && (
-        <Bloom
-          intensity={bloomIntensity ?? BLOOM_CONFIG.intensity}
-          luminanceThreshold={BLOOM_CONFIG.luminanceThreshold}
-          luminanceSmoothing={BLOOM_CONFIG.luminanceSmoothing}
-          radius={BLOOM_CONFIG.radius}
-          blendFunction={BlendFunction.ADD}
-        />
-      )}
-      {enableVignette && (
-        <Vignette
-          offset={VIGNETTE_CONFIG.offset}
-          darkness={VIGNETTE_CONFIG.darkness}
-          blendFunction={BlendFunction.NORMAL}
-        />
-      )}
-    </EffectComposer>
-  );
+  // Build effects array to satisfy EffectComposer's strict children typing
+  const effects: React.ReactElement[] = [];
+
+  if (enableBloom) {
+    effects.push(
+      <Bloom
+        key="bloom"
+        intensity={bloomIntensity ?? BLOOM_CONFIG.intensity}
+        luminanceThreshold={BLOOM_CONFIG.luminanceThreshold}
+        luminanceSmoothing={BLOOM_CONFIG.luminanceSmoothing}
+        radius={BLOOM_CONFIG.radius}
+        blendFunction={BlendFunction.ADD}
+      />
+    );
+  }
+
+  if (enableVignette) {
+    effects.push(
+      <Vignette
+        key="vignette"
+        offset={VIGNETTE_CONFIG.offset}
+        darkness={VIGNETTE_CONFIG.darkness}
+        blendFunction={BlendFunction.NORMAL}
+      />
+    );
+  }
+
+  return <EffectComposer>{effects}</EffectComposer>;
 }

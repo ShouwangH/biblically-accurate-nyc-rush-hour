@@ -24,11 +24,11 @@ export const MAX_STATIONS = 100;
 /** Beam geometry dimensions */
 export const BEAM_DIMENSIONS = {
   /** Base width/depth of beam (meters) */
-  baseWidth: 5,
+  baseWidth: 8,
   /** Maximum height when intensity = 1.0 (meters) */
-  maxHeight: 150,
+  maxHeight: 400,
   /** Minimum height when intensity = minIntensityFloor (meters) */
-  minHeight: 10,
+  minHeight: 50,
 };
 
 /** Beam colors for intensity gradient */
@@ -126,7 +126,7 @@ export function StationBeams({ maxStations = MAX_STATIONS }: StationBeamsProps) 
       new THREE.MeshBasicMaterial({
         color: BEAM_COLORS.base,
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.85,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       }),

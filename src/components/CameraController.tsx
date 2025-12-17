@@ -363,7 +363,6 @@ export function CameraController({
 
   const {
     mode,
-    cameraTime,
     advanceCameraTime,
     currentPosition,
     currentTarget,

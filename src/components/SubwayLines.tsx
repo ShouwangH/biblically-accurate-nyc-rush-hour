@@ -27,6 +27,15 @@ const RADIAL_SEGMENTS = 8;
 /** Emissive intensity for the glow effect */
 const EMISSIVE_INTENSITY = 0.4;
 
+/** Ghost layer opacity (visible through buildings) */
+const GHOST_OPACITY = 0.4;
+
+/** Ghost layer emissive intensity (more intense for visibility) */
+const GHOST_EMISSIVE_INTENSITY = 0.6;
+
+/** Render order for ghost layer (renders after buildings) */
+const GHOST_RENDER_ORDER = 10;
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -56,7 +65,7 @@ function createTubeGeometry(segment: SubwayLineSegment): THREE.TubeGeometry {
 }
 
 /**
- * Creates material for a subway line.
+ * Creates material for a subway line (solid layer).
  */
 function createLineMaterial(
   color: string,
@@ -71,27 +80,57 @@ function createLineMaterial(
   });
 }
 
+/**
+ * Creates ghost material for a subway line (always visible through buildings).
+ * Uses depthTest: false to render on top of occluding geometry.
+ */
+function createGhostMaterial(
+  color: string,
+  glowColor: string
+): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: glowColor,
+    emissiveIntensity: GHOST_EMISSIVE_INTENSITY,
+    roughness: 0.4,
+    metalness: 0.2,
+    transparent: true,
+    opacity: GHOST_OPACITY,
+    depthTest: false,
+    depthWrite: false,
+  });
+}
+
 // =============================================================================
 // Sub-components
 // =============================================================================
 
 interface LineSegmentMeshProps {
   segment: SubwayLineSegment;
-  material: THREE.MeshStandardMaterial;
+  solidMaterial: THREE.MeshStandardMaterial;
+  ghostMaterial: THREE.MeshStandardMaterial;
 }
 
 /**
- * Renders a single line segment as a tube mesh.
+ * Renders a single line segment as a tube mesh with both solid and ghost layers.
+ * - Solid layer: normal depth-tested rendering
+ * - Ghost layer: always visible (depthTest: false) with transparency
  */
-function LineSegmentMesh({ segment, material }: LineSegmentMeshProps) {
+function LineSegmentMesh({ segment, solidMaterial, ghostMaterial }: LineSegmentMeshProps) {
   const geometry = useMemo(
     () => createTubeGeometry(segment),
     [segment]
   );
 
   return (
-    // eslint-disable-next-line react/no-unknown-property
-    <mesh geometry={geometry} material={material} />
+    <>
+      {/* Solid layer - normal rendering with depth test */}
+      {/* eslint-disable-next-line react/no-unknown-property */}
+      <mesh geometry={geometry} material={solidMaterial} />
+      {/* Ghost layer - always visible through buildings */}
+      {/* eslint-disable-next-line react/no-unknown-property */}
+      <mesh geometry={geometry} material={ghostMaterial} renderOrder={GHOST_RENDER_ORDER} />
+    </>
   );
 }
 
@@ -100,11 +139,16 @@ interface SubwayLineMeshesProps {
 }
 
 /**
- * Renders all segments for a single subway line.
+ * Renders all segments for a single subway line with solid and ghost layers.
  */
 function SubwayLineMeshes({ line }: SubwayLineMeshesProps) {
-  const material = useMemo(
+  const solidMaterial = useMemo(
     () => createLineMaterial(line.color, line.glowColor),
+    [line.color, line.glowColor]
+  );
+
+  const ghostMaterial = useMemo(
+    () => createGhostMaterial(line.color, line.glowColor),
     [line.color, line.glowColor]
   );
 
@@ -114,7 +158,8 @@ function SubwayLineMeshes({ line }: SubwayLineMeshesProps) {
         <LineSegmentMesh
           key={`${line.id}-seg-${index}`}
           segment={segment}
-          material={material}
+          solidMaterial={solidMaterial}
+          ghostMaterial={ghostMaterial}
         />
       ))}
     </group>

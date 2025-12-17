@@ -1,16 +1,6 @@
 /**
  * Overlay Component Tests
  *
-<<<<<<< feat/real-data
- * Tests for the UI overlay showing legend.
- * Per CLAUDE.md §8.7: TDD - tests define invariants.
- */
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { Overlay } from '../Overlay';
-
-describe('Overlay', () => {
-=======
  * Tests for the UI overlay showing clock and legend.
  * Per CLAUDE.md §8.7: TDD - tests define invariants.
  */
@@ -48,7 +38,6 @@ describe('Overlay', () => {
     });
   });
 
->>>>>>> main
   describe('legend', () => {
     it('renders the legend section', () => {
       render(<Overlay />);
@@ -82,8 +71,6 @@ describe('Overlay', () => {
       expect(style.position).toBe('absolute');
     });
 
-<<<<<<< feat/real-data
-=======
     it('has readable font size', () => {
       render(<Overlay />);
       const clock = screen.getByTestId('clock');
@@ -95,7 +82,6 @@ describe('Overlay', () => {
       expect(parseFloat(style.fontSize)).toBeGreaterThan(0);
     });
 
->>>>>>> main
     it('does not block 3D interaction (pointer-events)', () => {
       render(<Overlay />);
       const overlay = screen.getByTestId('overlay');
@@ -103,8 +89,6 @@ describe('Overlay', () => {
       expect(style.pointerEvents).toBe('none');
     });
   });
-<<<<<<< feat/real-data
-=======
 
   describe('title', () => {
     it('displays visualization title', () => {
@@ -112,5 +96,4 @@ describe('Overlay', () => {
       expect(screen.getByText(/NYC Rush Hour/i)).toBeInTheDocument();
     });
   });
->>>>>>> main
 });

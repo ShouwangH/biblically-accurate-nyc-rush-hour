@@ -1,0 +1,8 @@
+# Downloaded GIS data (large files)
+data/*
+!data/.gitkeep
+
+# QGIS temporary files
+*.qgz~
+*.qgs~
+.qgis2/

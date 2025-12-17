@@ -1,21 +1,18 @@
 {
-  "totalSegments": 4785,
-  "totalNodes": 3245,
-  "componentCount": 820,
-  "largestComponentSize": 620,
-  "largestComponentPct": 12.96,
-  "reachableFromEntries": 4785,
-  "reachableFromEntriesPct": 100.0,
-  "interiorDeadEnds": 921,
-  "interiorDeadEndPct": 19.25,
-  "boundaryDeadEnds": 94,
-  "entryPointCount": 1028,
-  "majorSegmentCount": 739,
-  "avgSuccessors": 0.91,
-  "avgPredecessors": 0.91,
-  "passed": false,
-  "failures": [
-    "Largest component 13.0% < 90.0% threshold",
-    "Interior dead ends 19.2% > 5.0% threshold"
-  ]
+  "totalSegments": 9463,
+  "totalNodes": 5434,
+  "componentCount": 2,
+  "largestComponentSize": 9461,
+  "largestComponentPct": 99.98,
+  "reachableFromEntries": 9461,
+  "reachableFromEntriesPct": 99.98,
+  "interiorDeadEnds": 31,
+  "interiorDeadEndPct": 0.33,
+  "boundaryDeadEnds": 0,
+  "entryPointCount": 29,
+  "majorSegmentCount": 3064,
+  "avgSuccessors": 2.06,
+  "avgPredecessors": 2.06,
+  "passed": true,
+  "failures": []
 }

@@ -37,6 +37,43 @@ import type {
  */
 export const USE_TRIP_ENGINE = true;
 
+/**
+ * Asset source selection for 3D models.
+ * - 'legacy': Original 2014 buildings.glb (5.7MB, ~300k tris)
+ * - 'nyc3d': NYC DCP 3D Model 2018 export (larger, more detailed)
+ *
+ * Toggle this to roll back if performance tanks.
+ */
+export type AssetSource = 'legacy' | 'nyc3d';
+export const ASSET_SOURCE: AssetSource = 'nyc3d';
+
+/**
+ * Asset paths based on source selection.
+ */
+export const ASSET_URLS = {
+  legacy: {
+    buildings: '/assets/buildings.glb',
+    roadbed: null,  // No roadbed in legacy
+    parks: null,
+    water: null,
+    landmarks: null,
+  },
+  nyc3d: {
+    buildings: '/assets/nyc3d/buildings.glb',
+    roadbed: '/assets/nyc3d/roadbed.glb',
+    parks: '/assets/nyc3d/parks.glb',
+    water: '/assets/nyc3d/water.glb',
+    landmarks: '/assets/nyc3d/landmarks.glb',
+  },
+} as const;
+
+/**
+ * Get current asset URLs based on ASSET_SOURCE flag.
+ */
+export function getAssetUrls() {
+  return ASSET_URLS[ASSET_SOURCE];
+}
+
 // =============================================================================
 // Error Type
 // =============================================================================

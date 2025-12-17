@@ -12,26 +12,25 @@
  */
 import { Suspense } from 'react';
 import { Scene } from './components/Scene';
-import { GroundPlane } from './components/GroundPlane';
-import { Parks } from './components/Parks';
 import { Buildings } from './components/Buildings';
+import { NYC3DLayers } from './components/NYC3DLayers';
 import { SubwayLines } from './components/SubwayLines';
 import { RoadSegments } from './components/RoadSegments';
 import { Trains } from './components/Trains';
 import { StationBeams } from './components/StationBeams';
 import { Traffic } from './components/Traffic';
 import { HybridTraffic } from './components/HybridTraffic';
-
-// Feature flag: Use hybrid meso/micro traffic model instead of spawn-based
-const USE_HYBRID_TRAFFIC = true;
 import { PostProcessing } from './components/PostProcessing';
 import {
   CameraController,
   CameraControllerProvider,
 } from './components/CameraController';
 import { Overlay, Controls } from './components/UI';
-import { DataProvider } from './hooks/useDataLoader';
+import { DataProvider, getAssetUrls } from './hooks/useDataLoader';
 import { SimulationTimeProvider } from './hooks/useSimulationTime';
+
+// Feature flag: Use hybrid meso/micro traffic model instead of spawn-based
+const USE_HYBRID_TRAFFIC = true;
 
 /**
  * Loading indicator shown while data is being fetched.
@@ -78,14 +77,11 @@ export function App() {
                 {/* Camera control */}
                 <CameraController />
 
-                {/* Ground plane (rendered first, underneath everything) */}
-                <GroundPlane textureUrl="/assets/ground_map.jpg" />
-
-                {/* Parks overlay (above ground, below buildings) */}
-                <Parks />
+                {/* NYC 3D Model layers (roadbed, parks, water, landmarks) */}
+                <NYC3DLayers />
 
                 {/* Static geometry */}
-                <Buildings />
+                <Buildings url={getAssetUrls().buildings} />
                 <SubwayLines />
                 <RoadSegments />
 

@@ -52,8 +52,8 @@ CONFIG = {
         "J", "Z", "L", "N", "Q", "R", "W"
     ],
 
-    # Output path
-    "output_path": os.path.join(SCRIPT_DIR, "..", "src", "assets", "trips.json"),
+    # Output path (public/assets is served directly by Vite)
+    "output_path": os.path.join(SCRIPT_DIR, "..", "public", "assets", "trips.json"),
 
     # Line colors from subway_lines.json
     "subway_lines_path": os.path.join(SCRIPT_DIR, "..", "src", "assets", "subway_lines.json"),
@@ -76,6 +76,13 @@ ORIGIN_LNG = -74.017
 METERS_PER_DEGREE_LAT = 111320
 METERS_PER_DEGREE_LNG = METERS_PER_DEGREE_LAT * math.cos(ORIGIN_LAT * math.pi / 180)
 
+# Offset correction to align WGS84 data with NYC 3D Model (State Plane)
+# The NYC 3D Model uses State Plane coordinates which don't perfectly align
+# with simple WGS84 conversion. These offsets correct for the difference.
+# Positive X = shift east, Positive Z = shift south
+OFFSET_X = -150  # meters (shift west to align)
+OFFSET_Z = 150   # meters (shift south to align)
+
 
 # =============================================================================
 # Coordinate Conversion
@@ -84,10 +91,10 @@ METERS_PER_DEGREE_LNG = METERS_PER_DEGREE_LAT * math.cos(ORIGIN_LAT * math.pi / 
 def to_local_coords(lat: float, lon: float, elevation: float = 0) -> List[float]:
     """
     Convert WGS84 coordinates to local meter-based coordinates.
-    Matches src/utils/coordinates.ts toLocalCoords().
+    Matches src/utils/coordinates.ts toLocalCoords() with offset correction.
     """
-    x = (lon - ORIGIN_LNG) * METERS_PER_DEGREE_LNG
-    z = -(lat - ORIGIN_LAT) * METERS_PER_DEGREE_LAT  # negative because north = negative z
+    x = (lon - ORIGIN_LNG) * METERS_PER_DEGREE_LNG + OFFSET_X
+    z = -(lat - ORIGIN_LAT) * METERS_PER_DEGREE_LAT + OFFSET_Z
     y = elevation
     return [round(x, 1), round(y, 1), round(z, 1)]
 

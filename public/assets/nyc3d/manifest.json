@@ -1,0 +1,19 @@
+{
+  "version": "v1",
+  "generated": "2025-12-17T17:38:50Z",
+  "source": "NYC DCP 3D Building Model (2018)",
+  "assets": {
+    "landmarks": {
+      "file": "landmarks.glb",
+      "size_bytes": 54052
+    }
+  },
+  "stats": {
+    "objects_processed": 1051,
+    "total_vertices": 4425,
+    "total_faces": 2341,
+    "layers_processed": {
+      "Statue_of_Liberty": 2457
+    }
+  }
+}

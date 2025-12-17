@@ -35,8 +35,8 @@ CONFIG = {
     "min_longitude": -74.02,
     "max_longitude": -73.97,
 
-    # Output path
-    "output_path": os.path.join(os.path.dirname(__file__), "..", "src", "assets", "subway_lines.json"),
+    # Output path (public/assets is served directly by Vite)
+    "output_path": os.path.join(os.path.dirname(__file__), "..", "public", "assets", "subway_lines.json"),
 
     # Cache path for downloaded GeoJSON
     "cache_path": os.path.join(os.path.dirname(__file__), "subway_lines_raw.geojson"),
@@ -103,10 +103,17 @@ ORIGIN_LNG = -74.0170
 METERS_PER_DEGREE_LAT = 111320
 METERS_PER_DEGREE_LNG = 111320 * math.cos(ORIGIN_LAT * math.pi / 180)
 
+# Offset correction to align WGS84 data with NYC 3D Model (State Plane)
+# The NYC 3D Model uses State Plane coordinates which don't perfectly align
+# with simple WGS84 conversion. These offsets correct for the difference.
+# Positive X = shift east, Positive Z = shift south
+OFFSET_X = -150  # meters (shift west to align)
+OFFSET_Z = 150   # meters (shift south to align)
+
 def to_local_coords(lat: float, lng: float, elevation: float = 0) -> Tuple[float, float, float]:
     """Convert WGS84 to local coordinate system (meters)."""
-    x = (lng - ORIGIN_LNG) * METERS_PER_DEGREE_LNG
-    z = -(lat - ORIGIN_LAT) * METERS_PER_DEGREE_LAT
+    x = (lng - ORIGIN_LNG) * METERS_PER_DEGREE_LNG + OFFSET_X
+    z = -(lat - ORIGIN_LAT) * METERS_PER_DEGREE_LAT + OFFSET_Z
     y = elevation
     return (round(x), round(y), round(z))
 

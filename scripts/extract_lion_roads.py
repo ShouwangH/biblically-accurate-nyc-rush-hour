@@ -42,6 +42,11 @@ ORIGIN_LNG = -74.017
 METERS_PER_DEG_LAT = 111320
 METERS_PER_DEG_LNG = 111320 * math.cos(math.radians(ORIGIN_LAT))
 
+# Offset correction to align WGS84 data with NYC 3D Model (State Plane)
+# These offsets correct for the difference between WGS84 and State Plane origins
+OFFSET_X = -150  # meters (shift west to align with NYC 3D Model)
+OFFSET_Z = -150  # meters (shift north to align with NYC 3D Model)
+
 # Traffic direction codes
 # T = Two-way, W = With (From->To), A = Against (To->From), P = Pedestrian
 VEHICULAR_TRAF_DIRS = {'T', 'W', 'A', ''}
@@ -65,9 +70,11 @@ def wgs84_to_local(lng: float, lat: float) -> Tuple[float, float]:
     Origin: Battery Park (40.7033, -74.017)
     X-axis: positive = east
     Z-axis: negative = north, positive = south
+
+    Includes offset correction to align with NYC 3D Model (State Plane).
     """
-    x = (lng - ORIGIN_LNG) * METERS_PER_DEG_LNG
-    z = -(lat - ORIGIN_LAT) * METERS_PER_DEG_LAT  # Negative because north = negative Z
+    x = (lng - ORIGIN_LNG) * METERS_PER_DEG_LNG + OFFSET_X
+    z = -(lat - ORIGIN_LAT) * METERS_PER_DEG_LAT + OFFSET_Z
     return (round(x, 1), round(z, 1))
 
 

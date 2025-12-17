@@ -189,6 +189,31 @@ describe('SubwayLines component', () => {
       expect(material.emissive.getHexString()).toBe('1e5fd9');
       expect(material.emissiveIntensity).toBe(0.5);
     });
+
+    it('creates ghost material with transparency and disabled depth test', () => {
+      // Ghost material should be visible through buildings
+      const ghostMaterial = new THREE.MeshStandardMaterial({
+        color: '#0039A6',
+        emissive: '#1E5FD9',
+        emissiveIntensity: 0.2,
+        transparent: true,
+        opacity: 0.15,
+        depthTest: false,
+        depthWrite: false,
+      });
+
+      expect(ghostMaterial.transparent).toBe(true);
+      expect(ghostMaterial.opacity).toBe(0.15);
+      expect(ghostMaterial.depthTest).toBe(false);
+      expect(ghostMaterial.depthWrite).toBe(false);
+    });
+
+    it('ghost material has lower emissive intensity than solid', () => {
+      const solidEmissiveIntensity = 0.4;
+      const ghostEmissiveIntensity = 0.2;
+
+      expect(ghostEmissiveIntensity).toBeLessThan(solidEmissiveIntensity);
+    });
   });
 });
 

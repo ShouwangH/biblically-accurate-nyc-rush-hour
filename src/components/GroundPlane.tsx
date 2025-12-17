@@ -10,7 +10,6 @@
  */
 import { useEffect, useMemo } from 'react';
 import { useTexture } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   GROUND_WIDTH,
@@ -30,8 +29,8 @@ const DEFAULT_TEXTURE_PATH = '/assets/ground_map.png';
 /** Ground plane color - fallback when texture not provided */
 export const GROUND_COLOR = '#E8E8E8';
 
-/** Ground plane opacity */
-export const GROUND_OPACITY = 0.9;
+/** Ground plane opacity - full opacity, water/parks rendered as overlays */
+export const GROUND_OPACITY = 1.0;
 
 // =============================================================================
 // Component
@@ -83,56 +82,28 @@ interface TexturedGroundProps {
  * Ground plane with texture. Applies proper filtering for smooth appearance.
  */
 function TexturedGround({ textureUrl }: TexturedGroundProps) {
-  const { gl } = useThree();
   const texture = useTexture(textureUrl);
 
-  // Configure texture filtering once on load
-  useEffect(() => {
-    // Trilinear filtering for smooth mipmap transitions
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-
-    // High anisotropy for ground plane at grazing angles
-    const maxAnisotropy = gl.capabilities.getMaxAnisotropy();
-    texture.anisotropy = Math.min(maxAnisotropy, 16);
-
-    // Generate mipmaps for distance rendering
-    texture.generateMipmaps = true;
-
-    // Flip Y to match PNG coordinate system
-    // PNG: (0,0) at top-left; PlaneGeometry UV: (0,0) at bottom-left
-    texture.flipY = false;
-
-    texture.needsUpdate = true;
-  }, [texture, gl]);
-
-  // Create textured material (once, not per-frame)
-  const material = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        opacity: GROUND_OPACITY,
-        side: THREE.FrontSide,
-        depthWrite: false,
-      }),
-    [texture]
-  );
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      material.dispose();
-    };
-  }, [material]);
+  // Configure texture once on load
+  // Note: drei's useTexture already sets reasonable defaults
+  useMemo(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+  }, [texture]);
 
   return (
     <mesh
       position={[GROUND_CENTER_X, GROUND_Y_POSITION, GROUND_CENTER_Z]}
       rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={-1}
     >
       <planeGeometry args={[GROUND_WIDTH, GROUND_DEPTH]} />
-      <primitive object={material} attach="material" />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        opacity={GROUND_OPACITY}
+        side={THREE.FrontSide}
+        depthWrite={false}
+      />
     </mesh>
   );
 }
@@ -169,6 +140,7 @@ function SolidGround() {
     <mesh
       position={[GROUND_CENTER_X, GROUND_Y_POSITION, GROUND_CENTER_Z]}
       rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={-1}  // Render before other transparent objects
     >
       <planeGeometry args={[GROUND_WIDTH, GROUND_DEPTH]} />
       <primitive object={material} attach="material" />

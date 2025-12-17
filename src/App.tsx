@@ -13,6 +13,7 @@
 import { Suspense } from 'react';
 import { Scene } from './components/Scene';
 import { GroundPlane } from './components/GroundPlane';
+import { Parks } from './components/Parks';
 import { Buildings } from './components/Buildings';
 import { SubwayLines } from './components/SubwayLines';
 import { RoadSegments } from './components/RoadSegments';
@@ -74,7 +75,10 @@ export function App() {
                 <CameraController />
 
                 {/* Ground plane (rendered first, underneath everything) */}
-                <GroundPlane />
+                <GroundPlane textureUrl="/assets/ground_map.jpg" />
+
+                {/* Parks overlay (above ground, below buildings) */}
+                <Parks />
 
                 {/* Static geometry */}
                 <Buildings />

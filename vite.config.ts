@@ -15,13 +15,20 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    // three.js is expected to be large (~670KB), suppress warning
+    chunkSizeWarningLimit: 700,
+    // Enable source maps for production debugging
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
           three: ['three'],
           r3f: ['@react-three/fiber', '@react-three/drei'],
+          postprocessing: ['@react-three/postprocessing', 'postprocessing'],
         },
       },
     },
   },
+  // Base URL for deployment (can be overridden with env var)
+  base: process.env.VITE_BASE_URL || '/',
 });

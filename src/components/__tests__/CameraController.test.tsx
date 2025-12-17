@@ -34,7 +34,6 @@ import {
   useCameraController,
   CameraControllerProvider,
   type CameraKeyframe,
-  type CameraMode,
   interpolateKeyframes,
   DEFAULT_KEYFRAMES,
 } from '../CameraController';
@@ -307,8 +306,6 @@ describe('CameraController', () => {
       act(() => {
         result.current.setMode('manual');
       });
-
-      const positionBefore = [...result.current.currentPosition];
 
       act(() => {
         result.current.setCameraTime(0.5);

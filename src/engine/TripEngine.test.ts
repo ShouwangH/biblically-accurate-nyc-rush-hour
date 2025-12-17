@@ -11,9 +11,9 @@
  * - Interpolates between station stops, not segment boundaries
  * - Uses distanceAlongRoute for position interpolation
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { TripEngine, type ActiveTrain } from './TripEngine';
-import type { Trip, TripStop, Point3D } from '../data/types';
+import { describe, it, expect } from 'vitest';
+import { TripEngine } from './TripEngine';
+import type { Trip, Point3D } from '../data/types';
 
 // =============================================================================
 // Test Data
@@ -150,7 +150,7 @@ describe('TripEngine', () => {
 
       const active = engine.getActiveTrains(0.2);
       expect(active).toHaveLength(1);
-      expect(active[0].id).toBe('trip-partial');
+      expect(active[0]!.id).toBe('trip-partial');
     });
 
     it('returns train when time is within trip window', () => {
@@ -159,7 +159,7 @@ describe('TripEngine', () => {
 
       const active = engine.getActiveTrains(0.4);
       expect(active).toHaveLength(1);
-      expect(active[0].id).toBe('trip-partial');
+      expect(active[0]!.id).toBe('trip-partial');
     });
 
     it('returns multiple active trains when windows overlap', () => {
@@ -187,7 +187,7 @@ describe('TripEngine', () => {
       const active = engine.getActiveTrains(0.0);
       expect(active).toHaveLength(1);
 
-      const pos = active[0].position;
+      const pos = active[0]!.position;
       expect(pos[0]).toBeCloseTo(0, 0);   // x
       expect(pos[1]).toBeCloseTo(-15, 0); // y
       expect(pos[2]).toBeCloseTo(0, 0);   // z
@@ -203,7 +203,7 @@ describe('TripEngine', () => {
       const active = engine.getActiveTrains(0.25);
       expect(active).toHaveLength(1);
 
-      const pos = active[0].position;
+      const pos = active[0]!.position;
       expect(pos[0]).toBeCloseTo(250, 0);
       expect(pos[1]).toBeCloseTo(-15, 0);
       expect(pos[2]).toBeCloseTo(0, 0);
@@ -217,7 +217,7 @@ describe('TripEngine', () => {
       const active = engine.getActiveTrains(0.5);
       expect(active).toHaveLength(1);
 
-      const pos = active[0].position;
+      const pos = active[0]!.position;
       expect(pos[0]).toBeCloseTo(500, 0);
     });
 
@@ -231,7 +231,7 @@ describe('TripEngine', () => {
       const active = engine.getActiveTrains(0.75);
       expect(active).toHaveLength(1);
 
-      const pos = active[0].position;
+      const pos = active[0]!.position;
       expect(pos[0]).toBeCloseTo(750.5, 0); // Allow tolerance of 1 decimal place
     });
 
@@ -274,7 +274,7 @@ describe('TripEngine', () => {
       const active = engine.getActiveTrains(0.5);
       expect(active).toHaveLength(1);
 
-      const pos = active[0].position;
+      const pos = active[0]!.position;
       expect(pos[0]).toBeCloseTo(100, 1);  // x at corner
       expect(pos[1]).toBeCloseTo(-15, 1);  // y unchanged
       expect(pos[2]).toBeCloseTo(0, 1);    // z at corner (before turning)
@@ -291,7 +291,7 @@ describe('TripEngine', () => {
       const engine = new TripEngine([trip]);
 
       const active = engine.getActiveTrains(0.0);
-      expect(active[0].progress).toBeCloseTo(0, 2);
+      expect(active[0]!.progress).toBeCloseTo(0, 2);
     });
 
     it('returns progress based on distance traveled', () => {
@@ -303,7 +303,7 @@ describe('TripEngine', () => {
       // Distance = 0.5 * 500 = 250m
       // Overall progress = 250 / 1000 = 0.25
       const active = engine.getActiveTrains(0.25);
-      expect(active[0].progress).toBeCloseTo(0.25, 1);
+      expect(active[0]!.progress).toBeCloseTo(0.25, 1);
     });
 
     it('returns 0.5 progress at midpoint of route', () => {
@@ -312,7 +312,7 @@ describe('TripEngine', () => {
 
       // At t=0.5, at stop 2 which is 500m of 1000m = 0.5 progress
       const active = engine.getActiveTrains(0.5);
-      expect(active[0].progress).toBeCloseTo(0.5, 1);
+      expect(active[0]!.progress).toBeCloseTo(0.5, 1);
     });
   });
 
@@ -328,7 +328,7 @@ describe('TripEngine', () => {
       const active = engine.getActiveTrains(0.25);
       expect(active).toHaveLength(1);
 
-      const train = active[0];
+      const train = active[0]!;
       expect(train).toHaveProperty('id', 'trip-1');
       expect(train).toHaveProperty('lineId', '1');
       expect(train).toHaveProperty('position');
@@ -343,7 +343,7 @@ describe('TripEngine', () => {
       const engine = new TripEngine([trip]);
 
       const active = engine.getActiveTrains(0.3);
-      expect(active[0].direction).toBe(-1);
+      expect(active[0]!.direction).toBe(-1);
     });
 
     it('preserves color from trip', () => {
@@ -351,7 +351,7 @@ describe('TripEngine', () => {
       const engine = new TripEngine([trip]);
 
       const active = engine.getActiveTrains(0.3);
-      expect(active[0].color).toBe('#0039A6');
+      expect(active[0]!.color).toBe('#0039A6');
     });
 
     it('provides default crowding value', () => {
@@ -359,8 +359,8 @@ describe('TripEngine', () => {
       const engine = new TripEngine([trip]);
 
       const active = engine.getActiveTrains(0.25);
-      expect(active[0].crowding).toBeGreaterThanOrEqual(0);
-      expect(active[0].crowding).toBeLessThanOrEqual(1);
+      expect(active[0]!.crowding).toBeGreaterThanOrEqual(0);
+      expect(active[0]!.crowding).toBeLessThanOrEqual(1);
     });
   });
 
@@ -402,7 +402,7 @@ describe('TripEngine', () => {
       // At t=0.5, should be at 250
       const active = engine.getActiveTrains(0.5);
       expect(active).toHaveLength(1);
-      expect(active[0].position[0]).toBeCloseTo(250, 0);
+      expect(active[0]!.position[0]).toBeCloseTo(250, 0);
     });
 
     it('handles trip that starts before simulation window', () => {
@@ -442,7 +442,7 @@ describe('TripEngine', () => {
       // Position should be interpolated correctly
       // Progress in stops: (0 - (-0.2)) / (0.5 - (-0.2)) = 0.2 / 0.7 ≈ 0.286
       // Position: 0.286 * 500 ≈ 143
-      expect(active[0].position[0]).toBeCloseTo(143, -1);
+      expect(active[0]!.position[0]).toBeCloseTo(143, -1);
     });
 
     it('handles very short trip duration', () => {
@@ -478,7 +478,7 @@ describe('TripEngine', () => {
       // Should still work at t=0.5
       const active = engine.getActiveTrains(0.5);
       expect(active).toHaveLength(1);
-      expect(active[0].position[0]).toBeCloseTo(0, 0);
+      expect(active[0]!.position[0]).toBeCloseTo(0, 0);
     });
 
     it('handles empty stops array gracefully', () => {

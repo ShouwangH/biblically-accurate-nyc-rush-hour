@@ -10,9 +10,10 @@
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { TrainEngine } from '../engine/TrainEngine';
+import { TrainEngine, type ActiveTrain } from '../engine/TrainEngine';
+import { TripEngine } from '../engine/TripEngine';
 import { useSimulationTime } from '../hooks/useSimulationTime';
-import { useData } from '../hooks/useDataLoader';
+import { useData, USE_TRIP_ENGINE } from '../hooks/useDataLoader';
 
 // =============================================================================
 // Constants
@@ -39,6 +40,18 @@ export const CROWDING_BRIGHTNESS = {
   max: 1.0,
 };
 
+/** Ghost train configuration - visible through buildings */
+const GHOST_TRAIN = {
+  /** Scale multiplier (2x normal size) */
+  scale: 2.0,
+  /** Opacity for ghost layer */
+  opacity: 0.5,
+  /** Emissive intensity for glow effect */
+  emissiveIntensity: 0.8,
+  /** Render order (after buildings) */
+  renderOrder: 11,
+};
+
 // =============================================================================
 // Pre-allocated objects (per CLAUDE.md §8.6 - no allocations in render loop)
 // =============================================================================
@@ -48,6 +61,7 @@ const tempColor = new THREE.Color();
 const tempPosition = new THREE.Vector3();
 const tempQuaternion = new THREE.Quaternion();
 const tempScale = new THREE.Vector3(1, 1, 1);
+const tempGhostScale = new THREE.Vector3(GHOST_TRAIN.scale, GHOST_TRAIN.scale, GHOST_TRAIN.scale);
 
 // =============================================================================
 // Helper Functions
@@ -103,9 +117,13 @@ interface TrainsProps {
  * </Scene>
  * ```
  */
+/** Engine interface - both TrainEngine and TripEngine have getActiveTrains */
+type TrainEngineInterface = { getActiveTrains(t: number): ActiveTrain[] };
+
 export function Trains({ maxTrains = MAX_TRAINS }: TrainsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const engineRef = useRef<TrainEngine | null>(null);
+  const ghostMeshRef = useRef<THREE.InstancedMesh>(null);
+  const engineRef = useRef<TrainEngineInterface | null>(null);
 
   // Get simulation time from context
   const { t } = useSimulationTime();
@@ -124,7 +142,7 @@ export function Trains({ maxTrains = MAX_TRAINS }: TrainsProps) {
     []
   );
 
-  // Create material once
+  // Create material once (solid layer)
   const material = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
@@ -134,9 +152,28 @@ export function Trains({ maxTrains = MAX_TRAINS }: TrainsProps) {
     []
   );
 
+  // Create ghost material (visible through buildings, luminous)
+  // Using MeshBasicMaterial for uniform color without lighting (ghost effect)
+  const ghostMaterial = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: GHOST_TRAIN.opacity,
+        depthTest: false,
+        depthWrite: false,
+        // Additive blending for luminous glow effect
+        blending: THREE.AdditiveBlending,
+      }),
+    []
+  );
+
   // Initialize engine when data is available
   useEffect(() => {
-    if (data?.trainSchedules?.trains && data?.subwayLines?.lines) {
+    if (USE_TRIP_ENGINE && data?.trips?.trips) {
+      // Use trip-based engine with GTFS data
+      engineRef.current = new TripEngine(data.trips.trips);
+    } else if (data?.trainSchedules?.trains && data?.subwayLines?.lines) {
+      // Fallback to segment-based engine
       engineRef.current = new TrainEngine(
         data.trainSchedules.trains,
         data.subwayLines.lines
@@ -149,13 +186,15 @@ export function Trains({ maxTrains = MAX_TRAINS }: TrainsProps) {
     return () => {
       geometry.dispose();
       material.dispose();
+      ghostMaterial.dispose();
     };
-  }, [geometry, material]);
+  }, [geometry, material, ghostMaterial]);
 
   // Update mesh per frame
   useFrame(() => {
     const engine = engineRef.current;
     const mesh = meshRef.current;
+    const ghostMesh = ghostMeshRef.current;
 
     if (!engine || !mesh) return;
 
@@ -174,13 +213,22 @@ export function Trains({ maxTrains = MAX_TRAINS }: TrainsProps) {
         train.position[2]
       );
 
-      // Compose transform matrix
+      // Compose transform matrix for solid trains
       tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
       mesh.setMatrixAt(instanceIndex, tempMatrix);
 
       // Set color based on line color and crowding
       getTrainColor(train.color, train.crowding);
       mesh.setColorAt(instanceIndex, tempColor);
+
+      // Update ghost mesh (2x scale, same position)
+      if (ghostMesh) {
+        tempMatrix.compose(tempPosition, tempQuaternion, tempGhostScale);
+        ghostMesh.setMatrixAt(instanceIndex, tempMatrix);
+        // Ghost uses line color directly (no crowding dimming) for max visibility
+        tempColor.set(train.color);
+        ghostMesh.setColorAt(instanceIndex, tempColor);
+      }
 
       instanceIndex++;
     }
@@ -191,20 +239,41 @@ export function Trains({ maxTrains = MAX_TRAINS }: TrainsProps) {
     if (mesh.instanceColor) {
       mesh.instanceColor.needsUpdate = true;
     }
+
+    // Update ghost mesh
+    if (ghostMesh) {
+      ghostMesh.count = instanceIndex;
+      ghostMesh.instanceMatrix.needsUpdate = true;
+      if (ghostMesh.instanceColor) {
+        ghostMesh.instanceColor.needsUpdate = true;
+      }
+    }
   });
 
   // Don't render if no data
-  if (!data?.trainSchedules?.trains || !data?.subwayLines?.lines) {
+  const hasRequiredData = USE_TRIP_ENGINE
+    ? data?.trips?.trips
+    : data?.trainSchedules?.trains && data?.subwayLines?.lines;
+
+  if (!hasRequiredData) {
     return null;
   }
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, maxTrains]}
-      // Disable frustum culling to ensure all trains render
-      // eslint-disable-next-line react/no-unknown-property
-      frustumCulled={false}
-    />
+    <>
+      {/* Solid trains - normal rendering */}
+      <instancedMesh
+        ref={meshRef}
+        args={[geometry, material, maxTrains]}
+        frustumCulled={false}
+      />
+      {/* Ghost trains - visible through buildings, 2x size, luminous */}
+      <instancedMesh
+        ref={ghostMeshRef}
+        args={[geometry, ghostMaterial, maxTrains]}
+        frustumCulled={false}
+        renderOrder={GHOST_TRAIN.renderOrder}
+      />
+    </>
   );
 }

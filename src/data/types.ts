@@ -358,6 +358,152 @@ export interface GroundBounds {
 }
 
 // =============================================================================
+// Graph Road Segments (for trip-based traffic, feature flag: USE_TRIP_TRAFFIC)
+// =============================================================================
+
+/**
+ * Road segment with graph connectivity for trip-based traffic routing.
+ * Adds node references and adjacency lists for multi-segment vehicle trips.
+ */
+export interface GraphRoadSegment extends Omit<RoadSegment, 'congestionFactor'> {
+  /** Node ID at START of segment */
+  startNodeId?: string;
+
+  /** Node ID at END of segment */
+  endNodeId?: string;
+
+  /** Speed ratio = avgSpeedMph / freeFlowSpeedMph (renamed from congestionFactor) */
+  speedRatio: number;
+
+  /** Pre-computed polyline length in meters */
+  lengthMeters: number;
+
+  /** Heading in degrees [0, 360) at segment START */
+  startHeadingDeg: number;
+
+  /** Heading in degrees [0, 360) at segment END */
+  endHeadingDeg: number;
+
+  /** Major arterial (Broadway, avenues, FDR) vs local street */
+  isMajor: boolean;
+
+  /** Entry point where vehicles can spawn */
+  isEntry: boolean;
+
+  /** IDs of segments reachable from END of this segment */
+  successors: string[];
+
+  /** IDs of segments that lead INTO this segment (inverse of successors) */
+  predecessors: string[];
+
+  /** Original node IDs from LION data */
+  nodeIdFrom?: string;
+  nodeIdTo?: string;
+}
+
+/**
+ * Road network node at intersection.
+ */
+export interface RoadNode {
+  /** Unique node identifier */
+  id: string;
+
+  /** Position as [x, z] (y is always 0) */
+  position: [number, number];
+
+  /** Segments that START at this node */
+  outgoing: string[];
+
+  /** Segments that END at this node */
+  incoming: string[];
+
+  /** True if this is a map boundary or major unmodeled intersection */
+  isBoundary?: boolean;
+}
+
+/**
+ * Metadata for road nodes file.
+ */
+export interface RoadNodesMeta {
+  /** Total number of nodes */
+  nodeCount: number;
+
+  /** Snap radius used for clustering (if applicable) */
+  snapRadius?: number;
+}
+
+/**
+ * Root structure for road_nodes.json
+ */
+export interface RoadNodesFile {
+  meta: RoadNodesMeta;
+  nodes: RoadNode[];
+}
+
+// =============================================================================
+// Route Cache (Pre-computed Routes for Pseudo-Trip Model)
+// =============================================================================
+
+/**
+ * A pre-computed route template for pseudo-trip traffic.
+ */
+export interface RouteTemplate {
+  /** Entry segment where route begins */
+  entrySegmentId: string;
+
+  /** Ordered sequence of segment IDs to traverse */
+  segmentSequence: string[];
+
+  /** Total route length in meters */
+  totalLengthMeters: number;
+
+  /** Pre-computed cumulative distances at each segment boundary */
+  cumulativeDistances: number[];
+}
+
+/**
+ * Metadata for route cache file.
+ */
+export interface RouteCacheMeta {
+  /** ISO timestamp when cache was generated */
+  generatedAt: string;
+
+  /** Target routes per entry segment */
+  routesPerEntry: number;
+
+  /** Total routes in cache */
+  totalRoutes: number;
+
+  /** Hash of road graph for cache invalidation */
+  graphVersion: string;
+
+  /** Number of entry segments */
+  entryCount: number;
+
+  /** Entries that have routes */
+  entriesWithRoutes: number;
+
+  /** Average route length in meters */
+  avgRouteLength: number;
+
+  /** Average segments per route */
+  avgSegmentsPerRoute: number;
+
+  /** Length buckets used for generation */
+  lengthBuckets: number[];
+}
+
+/**
+ * Root structure for route_cache.json
+ */
+export interface RouteCacheFile {
+  meta: RouteCacheMeta;
+
+  /** Map from entrySegmentId to array of route templates */
+  routes: Record<string, RouteTemplate[]>;
+}
+
+// =============================================================================
 // Aggregated Data (for DataProvider context)
 // =============================================================================
 
@@ -372,4 +518,6 @@ export interface SimulationData {
   roadSegments: RoadSegmentsFile;
   /** Trip data for trip-based train engine (optional, loaded when USE_TRIP_ENGINE is true) */
   trips?: TripsFile;
+  /** Route cache for pseudo-trip traffic (optional) */
+  routeCache?: RouteCacheFile;
 }

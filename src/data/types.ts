@@ -224,6 +224,165 @@ export interface RoadSegmentsFile {
 }
 
 // =============================================================================
+// Road Graph (road_nodes.json, road_segments_graph.json)
+// =============================================================================
+
+/**
+ * A node in the road network graph.
+ * Nodes represent intersections or endpoints where segments connect.
+ * Created by clustering nearby segment endpoints.
+ */
+export interface RoadNode {
+  /** Unique node identifier */
+  id: string;
+
+  /** Position [x, z] in local coordinates (y is always 0) */
+  position: [number, number];
+
+  /** IDs of segments that START at this node */
+  outgoing: string[];
+
+  /** IDs of segments that END at this node */
+  incoming: string[];
+
+  /** True if node is at map boundary or major unmodeled intersection */
+  isBoundary: boolean;
+}
+
+/**
+ * Metadata for road nodes file.
+ */
+export interface RoadNodesMeta {
+  /** Total number of nodes */
+  nodeCount: number;
+
+  /** Clustering radius used to snap endpoints (meters) */
+  snapRadius: number;
+}
+
+/**
+ * Root structure for road_nodes.json
+ */
+export interface RoadNodesFile {
+  meta: RoadNodesMeta;
+  nodes: RoadNode[];
+}
+
+/**
+ * Road segment with graph connectivity and routing metadata.
+ * Extends base RoadSegment with adjacency information for multi-segment trips.
+ */
+export interface GraphRoadSegment extends RoadSegment {
+  /**
+   * Speed ratio = avgSpeedMph / freeFlowSpeedMph.
+   * Range: (0, 1]. Higher = faster = less congested.
+   * Replaces ambiguous congestionFactor for clarity.
+   */
+  speedRatio: number;
+
+  /** Pre-computed polyline length in meters */
+  lengthMeters: number;
+
+  /** Node ID at START of segment (from snapped node set) */
+  startNodeId: string;
+
+  /** Node ID at END of segment (from snapped node set) */
+  endNodeId: string;
+
+  /** Heading in degrees [0, 360) at segment START */
+  startHeadingDeg: number;
+
+  /** Heading in degrees [0, 360) at segment END */
+  endHeadingDeg: number;
+
+  /** Major arterial (Broadway, avenues, FDR) vs local street */
+  isMajor: boolean;
+
+  /** Entry point where vehicles can spawn (boundary or no predecessors) */
+  isEntry: boolean;
+
+  /** IDs of segments reachable from END of this segment (forward traversal) */
+  successors: string[];
+
+  /** IDs of segments that lead INTO this segment (inverse of successors) */
+  predecessors: string[];
+}
+
+/**
+ * Metadata for graph-augmented road segments file.
+ */
+export interface GraphRoadSegmentsMeta extends RoadSegmentsMeta {
+  /** Total segments classified as major arterials */
+  majorSegmentCount: number;
+
+  /** Total entry points (spawn locations) */
+  entryPointCount: number;
+
+  /** Sum of all successor links (for validation) */
+  totalSuccessorLinks: number;
+
+  /** Hash of the graph structure for cache invalidation */
+  graphVersion: string;
+}
+
+/**
+ * Root structure for road_segments_graph.json (augmented with connectivity)
+ */
+export interface GraphRoadSegmentsFile {
+  meta: GraphRoadSegmentsMeta;
+  segments: GraphRoadSegment[];
+}
+
+// =============================================================================
+// Route Cache (route_cache.json)
+// =============================================================================
+
+/**
+ * A pre-computed route template for vehicle trips.
+ * Vehicles follow these templates instead of computing routes at runtime.
+ */
+export interface RouteTemplate {
+  /** Entry segment where route begins */
+  entrySegmentId: string;
+
+  /** Ordered sequence of segment IDs to traverse */
+  segmentSequence: string[];
+
+  /** Total route length in meters */
+  totalLengthMeters: number;
+
+  /** Cumulative distances at each segment boundary [0, seg0.len, seg0+seg1, ...] */
+  cumulativeDistances: number[];
+}
+
+/**
+ * Metadata for route cache file.
+ */
+export interface RouteCacheMeta {
+  /** ISO timestamp when cache was generated */
+  generatedAt: string;
+
+  /** Number of routes generated per entry segment */
+  routesPerEntry: number;
+
+  /** Total routes in cache */
+  totalRoutes: number;
+
+  /** Hash of road_segments_graph.json for cache invalidation */
+  graphVersion: string;
+}
+
+/**
+ * Root structure for route_cache.json
+ */
+export interface RouteCacheFile {
+  meta: RouteCacheMeta;
+
+  /** Map from entry segment ID to array of route templates */
+  routes: Record<string, RouteTemplate[]>;
+}
+
+// =============================================================================
 // Ground Layer (ground plane bounds)
 // =============================================================================
 

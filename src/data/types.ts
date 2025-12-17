@@ -161,6 +161,95 @@ export interface TrainSchedulesFile {
 }
 
 // =============================================================================
+// Trips (trips.json) - Trip-based train model
+// =============================================================================
+
+/**
+ * A stop along a trip with arrival time and position.
+ * Used by TripEngine to interpolate train positions between stations.
+ */
+export interface TripStop {
+  /** GTFS stop_id, e.g., "137N" */
+  stopId: string;
+
+  /** Human-readable station name */
+  stationName: string;
+
+  /** Simulation time [0, 1) when train arrives at this stop */
+  arrivalTime: number;
+
+  /** Pre-computed position in local coordinates */
+  position: Point3D;
+
+  /** Distance from trip start along the polyline (meters) */
+  distanceAlongRoute: number;
+}
+
+/**
+ * A complete train trip from GTFS data.
+ * Unlike TrainRun (segment-based), Trip represents a full journey
+ * with station stops and continuous polyline geometry.
+ */
+export interface Trip {
+  /** GTFS trip_id */
+  id: string;
+
+  /** Line identifier, e.g., "1", "A" */
+  lineId: string;
+
+  /** Direction: +1 = northbound, -1 = southbound */
+  direction: 1 | -1;
+
+  /** Line color for rendering */
+  color: string;
+
+  /** Ordered stops with arrival times (clipped to viewport) */
+  stops: TripStop[];
+
+  /** Full route geometry from GTFS shapes (clipped to viewport) */
+  polyline: Point3D[];
+
+  /** Total length of polyline in meters */
+  totalLength: number;
+
+  /** Simulation time [0, 1) when trip enters viewport (first stop) */
+  tEnter: number;
+
+  /** Simulation time [0, 1) when trip exits viewport (last stop) */
+  tExit: number;
+}
+
+/**
+ * Metadata for trips file.
+ */
+export interface TripsMeta {
+  /** Data source identifier */
+  source: string;
+
+  /** ISO timestamp when file was generated */
+  generated: string;
+
+  /** Time window as "HH:MM-HH:MM" */
+  timeWindow: string;
+
+  /** Viewport bounds used for clipping */
+  viewport: {
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+  };
+}
+
+/**
+ * Root structure for trips.json
+ */
+export interface TripsFile {
+  meta: TripsMeta;
+  trips: Trip[];
+}
+
+// =============================================================================
 // Road Segments (road_segments.json)
 // =============================================================================
 

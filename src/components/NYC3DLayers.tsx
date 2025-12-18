@@ -66,18 +66,30 @@ const LAYER_CONFIGS = {
     polygonOffsetFactor: -1, // Behind roadbed (fills gaps)
   },
   parks: {
-    color: '#5a8a5e', // Lighter green for visibility
+    color: '#4a7c4e', // Muted green for parks
     roughness: 0.9,
     metalness: 0.0,
     side: THREE.DoubleSide,
     polygonOffsetFactor: -3, // Parks slightly in front of roadbed
   },
   water: {
-    color: '#3a7a9a', // Lighter blue for visibility
+    color: '#4a6a7c', // Muted blue-gray for water
     roughness: 0.3,
     metalness: 0.1,
     side: THREE.DoubleSide,
     polygonOffsetFactor: -1, // Water behind roadbed
+  },
+  exteriorWater: {
+    color: '#3a5a6c', // Slightly darker blue for deep water
+    roughness: 0.2,
+    metalness: 0.15,
+  },
+  land: {
+    color: '#8a8a8a', // Light gray for land base
+    roughness: 0.9,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+    polygonOffsetFactor: 1, // Push back in depth buffer to avoid z-fighting with parks
   },
   landmarks: {
     color: '#2d8a5f', // Patinated copper green (Statue of Liberty's actual color)
@@ -85,6 +97,13 @@ const LAYER_CONFIGS = {
     metalness: 0.3,
     side: THREE.DoubleSide,
     // No polygon offset needed - landmarks are above ground
+  },
+  infrastructure: {
+    color: '#5a5a5a', // Medium gray for bridges (slightly lighter than roadbed)
+    roughness: 0.85,
+    metalness: 0.15, // Slight metalness for steel bridges
+    side: THREE.DoubleSide,
+    // No polygon offset - bridges are elevated above ground
   },
 } as const;
 
@@ -108,12 +127,17 @@ function GLBLayer({ url, config, name }: GLBLayerProps) {
   // Create material
   const material = useMemo(() => createMaterial(config), [config]);
 
-  // Clone and apply material
+  // Clone and apply material, removing vertex colors so material color is used
   const clonedScene = useMemo(() => {
     const clone = scene.clone();
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).material = material;
+        const mesh = child as THREE.Mesh;
+        // Remove vertex colors so material color takes precedence
+        if (mesh.geometry?.attributes.color) {
+          mesh.geometry.deleteAttribute('color');
+        }
+        mesh.material = material;
       }
     });
     return clone;
@@ -180,6 +204,88 @@ export function RoadSurfacesLayer() {
   );
 }
 
+/**
+ * Infrastructure (bridges and tunnels) from NYC 3D Model.
+ * Includes Brooklyn Bridge, Manhattan Bridge, etc.
+ */
+export function InfrastructureLayer() {
+  return (
+    <GLBLayer
+      url="/assets/nyc3d/infrastructure.glb"
+      config={LAYER_CONFIGS.infrastructure}
+      name="infrastructure"
+    />
+  );
+}
+
+/**
+ * Land layer from borough boundaries.
+ * Covers Manhattan island, sits between water and roads.
+ */
+export function LandLayer() {
+  return (
+    <GLBLayer
+      url="/assets/nyc3d/land.glb"
+      config={LAYER_CONFIGS.land}
+      name="land"
+    />
+  );
+}
+
+// =============================================================================
+// Exterior Water Plane
+// =============================================================================
+
+/**
+ * Bounds for the exterior water plane (in local coordinates).
+ * Covers Hudson River, East River, and NY Harbor.
+ */
+const WATER_BOUNDS = {
+  minX: -3000,  // West (into Hudson)
+  maxX: 6000,   // East (into East River/Brooklyn)
+  minZ: -8000,  // South (into harbor)
+  maxZ: 2000,   // North
+};
+
+/**
+ * ExteriorWaterPlane renders a large water surface for rivers and harbor.
+ * Positioned below shoreline water (water.glb at Y=-1) to avoid z-fighting.
+ */
+export function ExteriorWaterPlane() {
+  const material = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: LAYER_CONFIGS.exteriorWater.color,
+      roughness: LAYER_CONFIGS.exteriorWater.roughness,
+      metalness: LAYER_CONFIGS.exteriorWater.metalness,
+      side: THREE.DoubleSide,
+    });
+  }, []);
+
+  // Cleanup material on unmount
+  useEffect(() => {
+    return () => {
+      material.dispose();
+    };
+  }, [material]);
+
+  // Calculate plane dimensions
+  const width = WATER_BOUNDS.maxX - WATER_BOUNDS.minX;
+  const depth = WATER_BOUNDS.maxZ - WATER_BOUNDS.minZ;
+  const centerX = (WATER_BOUNDS.minX + WATER_BOUNDS.maxX) / 2;
+  const centerZ = (WATER_BOUNDS.minZ + WATER_BOUNDS.maxZ) / 2;
+
+  return (
+    <mesh
+      position={[centerX, -2, centerZ]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
+      name="exterior-water"
+    >
+      <planeGeometry args={[width, depth]} />
+    </mesh>
+  );
+}
+
 // =============================================================================
 // Wrapper Component
 // =============================================================================
@@ -199,12 +305,23 @@ export function NYC3DLayers() {
 
   return (
     <>
+      {/* Layer order (bottom to top):
+          1. Exterior water (Y=-2) - base layer, covers all water areas
+          2. Land (Y=-0.5) - Manhattan island on top of water
+          3. Roadbed (Y=-0.15) - roads on top of land
+          4. Parks, buildings, landmarks at Y≥0
+      */}
+      <ExteriorWaterPlane />
+      <LandLayer />
+      {/* Shoreline water disabled - land layer now covers island properly */}
+      {/* <WaterLayer /> */}
+      <RoadbedLayer />
       {/* RoadSurfacesLayer disabled - needs offset fix to align with buildings */}
       {/* <RoadSurfacesLayer /> */}
-      <RoadbedLayer />
-      <ParksLayer />
-      <WaterLayer />
+      {/* ParksLayer disabled - using Parks component with parks.json for full coverage */}
+      {/* <ParksLayer /> */}
       <LandmarksLayer />
+      <InfrastructureLayer />
     </>
   );
 }

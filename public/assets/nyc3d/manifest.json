@@ -1,19 +1,20 @@
 {
   "version": "v1",
-  "generated": "2025-12-17T17:38:50Z",
+  "generated": "2025-12-17T22:39:55Z",
   "source": "NYC DCP 3D Building Model (2018)",
   "assets": {
-    "landmarks": {
-      "file": "landmarks.glb",
-      "size_bytes": 54052
+    "infrastructure": {
+      "file": "infrastructure.glb",
+      "size_bytes": 516928
     }
   },
   "stats": {
-    "objects_processed": 1051,
-    "total_vertices": 4425,
-    "total_faces": 2341,
+    "objects_processed": 190,
+    "total_vertices": 29386,
+    "total_faces": 29006,
     "layers_processed": {
-      "Statue_of_Liberty": 2457
+      "Bridges & Tunnels": 171,
+      "Bridge_Tunnel_Overpass": 23
     }
   }
 }

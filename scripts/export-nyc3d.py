@@ -99,8 +99,8 @@ ORIGIN_LNG = -74.0170
 
 # NYC State Plane Long Island (EPSG:2263) approximate conversion
 # These are rough values - actual conversion would need pyproj
-STATE_PLANE_ORIGIN_X = 980000  # feet (approximate X at Battery Park)
-STATE_PLANE_ORIGIN_Y = 196000  # feet (approximate Y at Battery Park)
+STATE_PLANE_ORIGIN_X = 979536  # feet (exact X at Battery Park via pyproj)
+STATE_PLANE_ORIGIN_Y = 195508  # feet (exact Y at Battery Park via pyproj)
 FEET_TO_METERS = 0.3048
 MM_TO_FEET = 0.00328084  # For files stored in mm (like MN06)
 
@@ -124,11 +124,29 @@ class ExportStats:
 # Rhino Geometry Extraction
 # =============================================================================
 
-def extract_3dm_files(data_dir: Path) -> List[Path]:
-    """Find and extract all .3dm files from zip archives."""
+def extract_3dm_files(data_dir: Path, include_brooklyn: bool = False) -> List[Path]:
+    """Find and extract .3dm files from zip archives.
+
+    Args:
+        data_dir: Directory containing NYC 3D Model zip files
+        include_brooklyn: If True, also process Brooklyn files (for bridges)
+
+    By default only processes MN (Manhattan) files. Set include_brooklyn=True
+    to also get Brooklyn Bridge, Manhattan Bridge, etc.
+    """
     extracted = []
 
     for zip_path in sorted(data_dir.glob('*.zip')):
+        stem_lower = zip_path.stem.lower()
+        # Process Manhattan files (MN01-MN06)
+        is_manhattan = stem_lower.startswith('nyc_3dmodel_mn')
+        # Process Brooklyn files (BK01-BK17) for bridges
+        is_brooklyn = stem_lower.startswith('nyc_3dmodel_bk') and include_brooklyn
+
+        if not is_manhattan and not is_brooklyn:
+            print(f"  Skipping {zip_path.name}")
+            continue
+
         print(f"  Extracting {zip_path.name}...")
         extract_dir = Path('/tmp') / zip_path.stem.upper()
         extract_dir.mkdir(exist_ok=True)
@@ -322,18 +340,23 @@ def extract_polygon_from_polyline(polyline_curve, transform_func) -> list | None
         return None
 
 
+# Track triangulation failures for debugging
+_triangulation_stats = {'success': 0, 'empty': 0, 'invalid': 0, 'tiny': 0, 'error': 0}
+
 def extract_flat_surface_from_polyline(polyline_curve, transform_func, y_level: float = 0.0) -> Tuple[List, List] | None:
     """Convert a closed polyline to a flat triangulated surface.
 
     Used for roadbed, water, parks which are stored as 2D polylines in the 3D model.
     Uses earcut triangulation for proper handling of concave polygons.
     """
+    global _triangulation_stats
     try:
         import numpy as np
 
         # Get polyline points
         polyline = polyline_curve.TryGetPolyline()
         if polyline is None or len(polyline) < 3:
+            _triangulation_stats['empty'] += 1
             return None
 
         # Extract points and transform
@@ -346,23 +369,35 @@ def extract_flat_surface_from_polyline(polyline_curve, transform_func, y_level: 
             points_3d.append([x, y_level, z])  # Set y to ground level
 
         if len(points_3d) < 3:
+            _triangulation_stats['empty'] += 1
             return None
 
         # Use earcut triangulation for robust handling of concave polygons
         try:
             import mapbox_earcut as earcut
-            from shapely.geometry import Polygon as ShapelyPolygon
+            from shapely.geometry import Polygon as ShapelyPolygon, MultiPolygon
 
             # Create shapely polygon to validate and clean
             poly = ShapelyPolygon(points_2d)
             if not poly.is_valid:
                 poly = poly.buffer(0)  # Fix self-intersections
-            if poly.is_empty or poly.area < 0.1:  # Skip tiny polygons
+                # buffer(0) can return MultiPolygon - handle that
+                if isinstance(poly, MultiPolygon):
+                    # Use largest polygon
+                    poly = max(poly.geoms, key=lambda g: g.area)
+
+            if poly.is_empty:
+                _triangulation_stats['invalid'] += 1
+                return None
+
+            if poly.area < 0.1:  # Skip tiny polygons (< 0.1 m²)
+                _triangulation_stats['tiny'] += 1
                 return None
 
             # Get the exterior ring coordinates
             coords = list(poly.exterior.coords)[:-1]  # Remove duplicate last point
             if len(coords) < 3:
+                _triangulation_stats['invalid'] += 1
                 return None
 
             # Prepare 2D array for earcut (shape: N x 2)
@@ -378,6 +413,7 @@ def extract_flat_surface_from_polyline(polyline_curve, transform_func, y_level: 
                 n = len(coords)
                 faces = [[0, i, i + 1] for i in range(1, n - 1)]
                 points_3d = [[x, y_level, z] for x, z in coords]
+                _triangulation_stats['success'] += 1
                 return points_3d, faces
 
             # Convert indices to faces
@@ -387,16 +423,25 @@ def extract_flat_surface_from_polyline(polyline_curve, transform_func, y_level: 
 
             # Convert to 3D vertices at y_level
             points_3d = [[x, y_level, z] for x, z in coords]
+            _triangulation_stats['success'] += 1
             return points_3d, faces
 
         except Exception as ex:
             # Fallback to simple fan triangulation
             n = len(points_3d)
             faces = [[0, i, i + 1] for i in range(1, n - 1)]
+            _triangulation_stats['success'] += 1
             return points_3d, faces
 
     except Exception as e:
+        _triangulation_stats['error'] += 1
         return None
+
+def print_triangulation_stats():
+    """Print triangulation statistics."""
+    global _triangulation_stats
+    print(f"    Triangulation stats: {_triangulation_stats}")
+    _triangulation_stats = {'success': 0, 'empty': 0, 'invalid': 0, 'tiny': 0, 'error': 0}
 
 
 def transform_coords(x: float, y: float, z: float) -> Tuple[float, float, float]:
@@ -424,11 +469,12 @@ def transform_coords(x: float, y: float, z: float) -> Tuple[float, float, float]
 # =============================================================================
 
 # Categories that should be flat surfaces (polylines -> flat mesh)
-FLAT_CATEGORIES = {'roadbed', 'water', 'parks'}
+FLAT_CATEGORIES = {'roadbed', 'water', 'parks', 'infrastructure'}
 
 # Categories that should use polygon union (merges overlapping shapes)
 # NOTE: Roadbed removed - union destroys street boundaries/curbs
-UNION_CATEGORIES = {'parks'}  # Only parks benefit from union
+# NOTE: Parks union disabled for debugging - may be causing gaps
+UNION_CATEGORIES = set()  # Disabled: {'parks'}
 
 # Y-levels for flat surfaces (meters)
 # Buildings sit at Y=0 (sidewalk level), roads are below curb height
@@ -436,6 +482,7 @@ FLAT_Y_LEVELS = {
     'roadbed': -0.15,  # Roads are ~15cm below curb/sidewalk level
     'water': -1.0,     # Water well below ground
     'parks': 0.01,     # Parks at sidewalk level (tiny offset to avoid z-fighting)
+    'infrastructure': 15.0,  # Bridges elevated ~15m above ground (typical clearance)
 }
 
 
@@ -519,6 +566,7 @@ def process_3dm_file(
         print(f"    Extracted {processed_in_file} meshes, {polygons_in_file} polygons")
     else:
         print(f"    Extracted {processed_in_file} meshes")
+    print_triangulation_stats()
 
 
 def merge_meshes(mesh_list: List[Dict]) -> Tuple[List, List]:
@@ -601,21 +649,31 @@ def union_and_triangulate_polygons(polygons_2d: List[List], y_level: float) -> T
 
         try:
             # Get exterior ring
-            coords = list(geom.exterior.coords)[:-1]
-            if len(coords) < 3:
+            exterior_coords = list(geom.exterior.coords)[:-1]
+            if len(exterior_coords) < 3:
                 continue
 
-            # Triangulate with earcut
-            # Note: earcut requires ring_end_indices for each ring
-            coords_array = np.array(coords, dtype=np.float64)
-            ring_end_indices = np.array([len(coords)], dtype=np.uint32)
+            # Collect all rings: exterior first, then holes
+            all_coords = list(exterior_coords)
+            ring_ends = [len(exterior_coords)]
+
+            # Add interior rings (holes) - these create holes in triangulation
+            for interior in geom.interiors:
+                hole_coords = list(interior.coords)[:-1]
+                if len(hole_coords) >= 3:
+                    all_coords.extend(hole_coords)
+                    ring_ends.append(len(all_coords))
+
+            # Triangulate with earcut (handles holes via ring_end_indices)
+            coords_array = np.array(all_coords, dtype=np.float64)
+            ring_end_indices = np.array(ring_ends, dtype=np.uint32)
             indices = earcut.triangulate_float64(coords_array, ring_end_indices)
 
             if len(indices) == 0:
                 continue
 
             # Add vertices (convert 2D [x,z] to 3D [x, y_level, z])
-            for x, z in coords:
+            for x, z in all_coords:
                 all_vertices.append([x, y_level, z])
 
             # Add faces with offset
@@ -626,7 +684,7 @@ def union_and_triangulate_polygons(polygons_2d: List[List], y_level: float) -> T
                     int(indices[i+2]) + vertex_offset
                 ])
 
-            vertex_offset += len(coords)
+            vertex_offset += len(all_coords)
 
         except Exception as e:
             continue
@@ -739,10 +797,14 @@ def export_to_gltf(
             mesh.update_faces(mask)
 
         # 3. Remove faces with very small area (thin slivers)
+        # NOTE: Lowered threshold - 0.01 m² was removing too many valid triangles
         areas = mesh.area_faces
-        min_area = 0.01  # 0.01 m² minimum
+        min_area = 0.0001  # 0.0001 m² = 1 cm² minimum (was 0.01 = 10cm x 10cm)
+        small_count = np.sum(areas < min_area)
         valid_area_mask = areas >= min_area
         mesh.update_faces(valid_area_mask)
+        if small_count > 0:
+            print(f"    Removed {small_count:,} tiny triangles (< {min_area} m²)")
 
         # 3b. Remove oversized triangles (triangulation bugs from degenerate polygons)
         # Max reasonable road polygon is ~70m x 70m = 5000 m²
@@ -756,12 +818,16 @@ def export_to_gltf(
 
         # 4. Remove duplicate faces (exact duplicates and reversed duplicates)
         # This helps when polygons share edges/overlap
+        before_merge = len(mesh.faces)
         mesh.merge_vertices()  # Ensure vertices are merged first
 
         # Get unique faces (considering both orientations)
         faces_sorted = np.sort(mesh.faces, axis=1)
         _, unique_idx = np.unique(faces_sorted, axis=0, return_index=True)
+        dup_count = len(mesh.faces) - len(unique_idx)
         mesh.update_faces(unique_idx)
+        if dup_count > 0:
+            print(f"    Removed {dup_count:,} duplicate faces")
 
         # 5. Remove unreferenced vertices
         mesh.remove_unreferenced_vertices()
@@ -783,8 +849,25 @@ def export_to_gltf(
         removed = initial_faces - len(mesh.faces)
         print(f"    After cleaning: {len(mesh.faces):,} faces (removed {removed:,})")
 
+    # Remove vertex colors before export to let Three.js material control color
+    # trimesh adds default gray vertex colors which override material in Three.js
+    # Setting visual to None and recreating mesh ensures no vertex colors
+    vertices = mesh.vertices.copy()
+    faces = mesh.faces.copy()
+    face_normals = mesh.face_normals.copy() if mesh.face_normals is not None else None
+
+    # Create a fresh mesh without visual data
+    clean_mesh = trimesh.Trimesh(
+        vertices=vertices,
+        faces=faces,
+        face_normals=face_normals,
+        process=False  # Don't process, keep as-is
+    )
+    # Explicitly set no visual to prevent default vertex colors
+    clean_mesh.visual = None
+
     # Export as GLB (binary glTF)
-    mesh.export(str(output_path), file_type='glb')
+    clean_mesh.export(str(output_path), file_type='glb')
 
     file_size = output_path.stat().st_size / (1024 * 1024)
     print(f"    Exported {category}: {len(mesh.faces):,} faces, {file_size:.1f} MB")
@@ -832,6 +915,8 @@ def main():
                        help='Analyze without exporting')
     parser.add_argument('--category', type=str,
                        help='Export only specific category')
+    parser.add_argument('--include-brooklyn', action='store_true',
+                       help='Include Brooklyn files (for bridges)')
     args = parser.parse_args()
 
     # Paths
@@ -861,7 +946,8 @@ def main():
 
     # Extract .3dm files
     print(f"\n1. Extracting .3dm files...")
-    dm_files = extract_3dm_files(data_dir)
+    include_brooklyn = args.include_brooklyn or (args.category == 'infrastructure')
+    dm_files = extract_3dm_files(data_dir, include_brooklyn=include_brooklyn)
     print(f"   Found {len(dm_files)} .3dm files")
 
     if not dm_files:

@@ -20,8 +20,8 @@ const PARKS_COLOR = '#90EE90';
 /** Parks opacity */
 const PARKS_OPACITY = 0.6;
 
-/** Y offset above ground plane to prevent z-fighting */
-const OVERLAY_Y_OFFSET = 0.15;
+/** Y offset above ground plane to prevent z-fighting with land layer */
+const OVERLAY_Y_OFFSET = 0.25;
 
 /** Render order for overlays (after ground, before buildings) */
 const OVERLAY_RENDER_ORDER = 1;

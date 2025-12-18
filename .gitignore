@@ -43,3 +43,6 @@ data/
 *.parquet
 *.3dm
 *.gdb
+
+# Generated tile data (run preprocessing scripts to regenerate)
+public/assets/tiles/

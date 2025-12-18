@@ -346,3 +346,192 @@ describe('DEFAULT_CYCLE_DURATION_SECONDS', () => {
     expect(DEFAULT_CYCLE_DURATION_SECONDS).toBeLessThanOrEqual(600);
   });
 });
+
+// =============================================================================
+// 24-Hour Time Model Tests (PR 4)
+// =============================================================================
+
+describe('24-Hour Time Model', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('hourFloat', () => {
+    it('provides hour as float [0, 24)', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // t=0 should be hour 0
+      expect(result.current.hourFloat).toBe(0);
+
+      // t=0.5 should be hour 12
+      act(() => {
+        result.current.setTime(0.5);
+      });
+      expect(result.current.hourFloat).toBe(12);
+
+      // t=0.75 should be hour 18
+      act(() => {
+        result.current.setTime(0.75);
+      });
+      expect(result.current.hourFloat).toBe(18);
+
+      // t=0.25 should be hour 6
+      act(() => {
+        result.current.setTime(0.25);
+      });
+      expect(result.current.hourFloat).toBe(6);
+    });
+
+    it('includes fractional hours', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // t = 0.5 + 0.5/24 = 12:30 = 12.5 hours
+      act(() => {
+        result.current.setTime(0.5 + 0.5 / 24);
+      });
+      expect(result.current.hourFloat).toBeCloseTo(12.5, 2);
+    });
+  });
+
+  describe('bucketIndex (15-minute buckets)', () => {
+    it('provides bucket index [0, 95] for 15-minute intervals', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // t=0 should be bucket 0 (00:00-00:15)
+      expect(result.current.bucketIndex).toBe(0);
+
+      // t=0.5 should be bucket 48 (12:00-12:15)
+      act(() => {
+        result.current.setTime(0.5);
+      });
+      expect(result.current.bucketIndex).toBe(48);
+
+      // t=0.75 should be bucket 72 (18:00-18:15)
+      act(() => {
+        result.current.setTime(0.75);
+      });
+      expect(result.current.bucketIndex).toBe(72);
+    });
+
+    it('bucket index never exceeds 95', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.setTime(0.9999);
+      });
+      expect(result.current.bucketIndex).toBeLessThanOrEqual(95);
+    });
+
+    it('covers 96 buckets for full day', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // 96 buckets × 15 minutes = 1440 minutes = 24 hours
+      // Test boundaries
+      const bucketsPerHour = 4;
+
+      // Start of each hour
+      for (let hour = 0; hour < 24; hour++) {
+        const t = hour / 24;
+        act(() => {
+          result.current.setTime(t);
+        });
+        expect(result.current.bucketIndex).toBe(hour * bucketsPerHour);
+      }
+    });
+  });
+
+  describe('bucketAlpha (lerp between buckets)', () => {
+    it('provides alpha [0, 1) for smooth interpolation', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // At bucket boundary, alpha should be 0
+      act(() => {
+        result.current.setTime(0); // Start of bucket 0
+      });
+      expect(result.current.bucketAlpha).toBe(0);
+
+      // Halfway through bucket, alpha should be ~0.5
+      act(() => {
+        // 7.5 minutes into 15-minute bucket
+        // 7.5 / 1440 = 0.00521 (7.5 minutes of 1440 total)
+        result.current.setTime(7.5 / 1440);
+      });
+      expect(result.current.bucketAlpha).toBeCloseTo(0.5, 1);
+    });
+
+    it('alpha never reaches 1', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // Just before bucket boundary
+      act(() => {
+        result.current.setTime(14.9 / 1440); // 14.9 minutes, just before 15
+      });
+      expect(result.current.bucketAlpha).toBeLessThan(1);
+    });
+
+    it('resets to 0 at each bucket boundary', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // At bucket 1 boundary (15 minutes)
+      act(() => {
+        result.current.setTime(15 / 1440);
+      });
+      expect(result.current.bucketIndex).toBe(1);
+      expect(result.current.bucketAlpha).toBeCloseTo(0, 2);
+    });
+  });
+
+  describe('tDay (seconds since midnight)', () => {
+    it('provides seconds since midnight [0, 86400)', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      // t=0 should be 0 seconds
+      expect(result.current.tDay).toBe(0);
+
+      // t=0.5 should be 43200 seconds (12 hours)
+      act(() => {
+        result.current.setTime(0.5);
+      });
+      expect(result.current.tDay).toBe(43200);
+
+      // t=1/24 should be 3600 seconds (1 hour)
+      act(() => {
+        result.current.setTime(1 / 24);
+      });
+      expect(result.current.tDay).toBe(3600);
+    });
+
+    it('tDay never reaches 86400', () => {
+      const { result } = renderHook(() => useSimulationTime(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.setTime(0.9999);
+      });
+      expect(result.current.tDay).toBeLessThan(86400);
+    });
+  });
+});

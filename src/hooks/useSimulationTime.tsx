@@ -37,6 +37,16 @@ const MIN_SPEED = 0.1;
 const MAX_SPEED = 10;
 
 // =============================================================================
+// 24-Hour Time Constants
+// =============================================================================
+
+/** Seconds per day */
+const SECONDS_PER_DAY = 24 * 60 * 60; // 86400
+
+/** Number of 15-minute buckets per day (for turnstile data) */
+export const NUM_BUCKETS = 96;
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -55,6 +65,22 @@ interface SimulationTimeContextValue {
 
   /** Human-readable time display (HH:MM) */
   displayTime: string;
+
+  // --- 24-Hour Time Extensions ---
+
+  /** Hour as float [0, 24) for sun position calculations */
+  hourFloat: number;
+
+  /** Seconds since midnight [0, 86400) for high-precision timing */
+  tDay: number;
+
+  /** Bucket index [0, 95] for 15-minute turnstile data bins */
+  bucketIndex: number;
+
+  /** Interpolation alpha [0, 1) within current bucket for smooth lerp */
+  bucketAlpha: number;
+
+  // --- Controls ---
 
   /** Start/resume time advancement */
   play: () => void;
@@ -205,6 +231,18 @@ export function SimulationTimeProvider({
   const sliceIndex = useMemo(() => getSliceIndex(t), [t]);
   const displayTime = useMemo(() => formatDisplayTime(t), [t]);
 
+  // 24-Hour derived values
+  const hourFloat = useMemo(() => t * 24, [t]);
+  const tDay = useMemo(() => t * SECONDS_PER_DAY, [t]);
+
+  // Bucket calculations for 15-minute turnstile data
+  const { bucketIndex, bucketAlpha } = useMemo(() => {
+    const rawBucket = t * NUM_BUCKETS;
+    const idx = Math.min(Math.floor(rawBucket), NUM_BUCKETS - 1);
+    const alpha = rawBucket - idx;
+    return { bucketIndex: idx, bucketAlpha: alpha };
+  }, [t]);
+
   // Context value
   const value = useMemo<SimulationTimeContextValue>(
     () => ({
@@ -213,13 +251,32 @@ export function SimulationTimeProvider({
       speed,
       sliceIndex,
       displayTime,
+      hourFloat,
+      tDay,
+      bucketIndex,
+      bucketAlpha,
       play,
       pause,
       toggle,
       setTime,
       setSpeed,
     }),
-    [t, isPlaying, speed, sliceIndex, displayTime, play, pause, toggle, setTime, setSpeed]
+    [
+      t,
+      isPlaying,
+      speed,
+      sliceIndex,
+      displayTime,
+      hourFloat,
+      tDay,
+      bucketIndex,
+      bucketAlpha,
+      play,
+      pause,
+      toggle,
+      setTime,
+      setSpeed,
+    ]
   );
 
   return <SimulationTimeContext.Provider value={value}>{children}</SimulationTimeContext.Provider>;

@@ -13,6 +13,7 @@
 import { Suspense } from 'react';
 import { Scene } from './components/Scene';
 import { Buildings } from './components/Buildings';
+import { Parks } from './components/Parks';
 import { NYC3DLayers } from './components/NYC3DLayers';
 import { SubwayLines } from './components/SubwayLines';
 import { RoadSegments } from './components/RoadSegments';
@@ -77,7 +78,10 @@ export function App() {
                 {/* Camera control */}
                 <CameraController />
 
-                {/* NYC 3D Model layers (roadbed, parks, water, landmarks) */}
+                {/* Parks from parks.json (pre-computed polygons with full coverage) */}
+                <Parks />
+
+                {/* NYC 3D Model layers (roadbed, water, landmarks - parks handled above) */}
                 <NYC3DLayers />
 
                 {/* Static geometry */}

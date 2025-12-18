@@ -19,14 +19,14 @@ import { useData } from '../hooks/useDataLoader';
  * Hidden by default since ground plane texture includes stylized roads.
  * Useful for debugging traffic vehicle paths.
  */
-const DEBUG_SHOW_ROAD_SEGMENTS = true;
+const DEBUG_SHOW_ROAD_SEGMENTS = false;
 
 /** Road line styling */
 const ROAD_STYLE = {
-  /** Line color - neon pink for alignment testing */
-  color: '#FF00FF',
+  /** Line color - subtle gray for road centerlines */
+  color: '#444444',
   /** Line opacity */
-  opacity: 1.0,
+  opacity: 0.3,
   /** Y offset to render slightly above ground */
   yOffset: 0.5,
 };

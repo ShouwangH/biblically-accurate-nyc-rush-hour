@@ -19,6 +19,9 @@ import sys
 from typing import List, Tuple, Dict, Any
 import urllib.request
 
+# Import shared coordinate transformation (uses pyproj for accuracy)
+from coordinates import wgs84_to_local as to_local_coords
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -95,27 +98,8 @@ MTA_COLORS = {
 }
 
 # =============================================================================
-# Coordinate Conversion
+# Bounds Checking
 # =============================================================================
-
-ORIGIN_LAT = 40.7033  # Battery Park
-ORIGIN_LNG = -74.0170
-METERS_PER_DEGREE_LAT = 111320
-METERS_PER_DEGREE_LNG = 111320 * math.cos(ORIGIN_LAT * math.pi / 180)
-
-# Offset correction to align WGS84 data with NYC 3D Model (State Plane)
-# The NYC 3D Model uses State Plane coordinates which don't perfectly align
-# with simple WGS84 conversion. These offsets correct for the difference.
-# Positive X = shift east, Positive Z = shift south
-OFFSET_X = -150  # meters (shift west to align)
-OFFSET_Z = 150   # meters (shift south to align)
-
-def to_local_coords(lat: float, lng: float, elevation: float = 0) -> Tuple[float, float, float]:
-    """Convert WGS84 to local coordinate system (meters)."""
-    x = (lng - ORIGIN_LNG) * METERS_PER_DEGREE_LNG + OFFSET_X
-    z = -(lat - ORIGIN_LAT) * METERS_PER_DEGREE_LAT + OFFSET_Z
-    y = elevation
-    return (round(x), round(y), round(z))
 
 def is_in_bounds(lat: float, lng: float) -> bool:
     """Check if coordinate is within Manhattan south of 34th."""

@@ -711,3 +711,193 @@ export interface SimulationData {
   /** Roadbed polygons (optional) */
   roadbeds?: RoadbedsFile;
 }
+
+// =============================================================================
+// Tile System (for LOD and streaming)
+// =============================================================================
+
+/**
+ * Tile coordinate in grid space.
+ * Each tile is TILE_SIZE × TILE_SIZE meters.
+ */
+export interface TileCoord {
+  /** Tile X index */
+  x: number;
+  /** Tile Z index */
+  z: number;
+}
+
+/**
+ * Tile bounds in world coordinates (meters).
+ */
+export interface TileBounds {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+/**
+ * LOD1 building box approximation.
+ * Used for instanced rendering at medium distance.
+ */
+export interface BuildingBox {
+  /** Center X position */
+  x: number;
+  /** Center Z position */
+  z: number;
+  /** Width in X direction */
+  width: number;
+  /** Depth in Z direction */
+  depth: number;
+  /** Building height */
+  height: number;
+  /** Color palette index for variation */
+  colorIdx?: number;
+}
+
+/**
+ * Per-tile manifest describing tile contents.
+ * Loaded from tiles/{x}_{z}.json
+ */
+export interface TileManifest {
+  coord: TileCoord;
+  bounds: TileBounds;
+
+  buildings: {
+    /** URL to LOD0 GLB chunk, null if no buildings in tile */
+    lod0Url: string | null;
+    /** Pre-computed LOD1 boxes */
+    lod1: BuildingBox[];
+    /** Triangle count for LOD0 (for budget tracking) */
+    lod0Triangles: number;
+    /** Byte size of LOD0 GLB */
+    lod0Bytes: number;
+    /** Number of LOD1 boxes */
+    lod1BoxCount: number;
+  };
+
+  roads: {
+    /** URL to binary road positions file */
+    binUrl: string;
+    /** Number of road segments */
+    segmentCount: number;
+    /** Byte size of binary file */
+    byteLength: number;
+  };
+
+  /** Station IDs within this tile */
+  stationIds: string[];
+
+  /** Total bytes for LRU eviction calculation */
+  totalBytes: number;
+}
+
+/**
+ * Loaded tile with geometry data.
+ */
+export interface LoadedTile {
+  manifest: TileManifest;
+  /** Road positions as Float32Array [x1,y1,z1, x2,y2,z2, ...] */
+  roads: Float32Array;
+  /** LOD0 scene (loaded lazily when tile enters LOD0 radius) */
+  lod0Scene: unknown | null;
+  /** Distance from camera at last update (for sorting) */
+  distance?: number;
+}
+
+/**
+ * Grouped visible tiles by LOD level.
+ */
+export interface VisibleTiles {
+  /** Tiles within LOD0 radius (full detail) */
+  lod0: LoadedTile[];
+  /** Tiles within LOD1 radius (medium detail) */
+  lod1: LoadedTile[];
+  /** Tiles within LOD2 radius (low detail / flat) */
+  lod2: LoadedTile[];
+}
+
+/**
+ * Tile index manifest for discovery.
+ * Loaded from tiles/index.json
+ */
+export interface TileIndex {
+  version: number;
+  tileSize: number;
+  bounds: {
+    minTileX: number;
+    maxTileX: number;
+    minTileZ: number;
+    maxTileZ: number;
+  };
+  tiles: Record<
+    string,
+    {
+      hasBuildings: boolean;
+      hasRoads: boolean;
+      stationCount: number;
+      lod0Triangles: number;
+      lod1Triangles: number;
+    }
+  >;
+}
+
+// =============================================================================
+// Turnstile Data (24-hour features)
+// =============================================================================
+
+/**
+ * Turnstile time series for a single station.
+ */
+export interface TurnstileStation {
+  /** MTA complex_id (matches StationData.id) */
+  stationId: string;
+
+  /** Normalized values [0, 1] for visualization */
+  normalized: {
+    entries: number[];
+    exits: number[];
+  };
+
+  /** Raw counts for tooltips/debugging */
+  raw: {
+    entries: number[];
+    exits: number[];
+  };
+}
+
+/**
+ * Root structure for turnstile_24h.json
+ */
+export interface TurnstileDataFile {
+  meta: {
+    /** Bin size in minutes (15) */
+    bucketMinutes: number;
+    /** Number of bins (96 for 24h × 4) */
+    bucketCount: number;
+    /** Normalization strategy */
+    normalization: string;
+    /** 95th percentile for clamping */
+    percentile95: number;
+    /** Source data date */
+    dataDate: string;
+  };
+  stations: TurnstileStation[];
+}
+
+// =============================================================================
+// Brooklyn District (overlay feature)
+// =============================================================================
+
+/**
+ * Brooklyn community district boundary.
+ */
+export interface BrooklynDistrictData {
+  name: string;
+  boroCD: number;
+  /** Polygon coordinates as [lng, lat] */
+  coordinates: [number, number][];
+  /** Centroid as [lng, lat] */
+  centroid: [number, number];
+}

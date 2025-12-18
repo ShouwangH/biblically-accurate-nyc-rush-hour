@@ -17,8 +17,8 @@ import { Environment } from './Environment';
 /** Camera settings for city-scale visualization */
 const CAMERA_CONFIG = {
   fov: 60, // Field of view in degrees
-  near: 1, // Near clipping plane (meters)
-  far: 20000, // Far clipping plane (meters) - needs to see whole city
+  near: 5, // Near clipping plane (meters) - raised for better z-buffer precision
+  far: 15000, // Far clipping plane (meters) - reduced for better z-buffer precision
   position: [2000, 1500, 2000] as [number, number, number], // Initial position (x, y, z)
 };
 
@@ -51,6 +51,7 @@ export function Scene({ children }: SceneProps) {
         antialias: true,
         alpha: false, // No transparency needed - solid background
         powerPreference: 'high-performance',
+        logarithmicDepthBuffer: true, // Better z-buffer precision at all distances
       }}
       style={{
         width: '100%',

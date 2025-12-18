@@ -25,6 +25,9 @@ from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
 import urllib.request
 
+# Import shared coordinate transformation (uses pyproj for accuracy)
+from coordinates import wgs84_to_local, is_in_viewport, VIEWPORT
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -52,8 +55,8 @@ CONFIG = {
         "J", "Z", "L", "N", "Q", "R", "W"
     ],
 
-    # Output path
-    "output_path": os.path.join(SCRIPT_DIR, "..", "src", "assets", "trips.json"),
+    # Output path (public/assets is served directly by Vite)
+    "output_path": os.path.join(SCRIPT_DIR, "..", "public", "assets", "trips.json"),
 
     # Line colors from subway_lines.json
     "subway_lines_path": os.path.join(SCRIPT_DIR, "..", "src", "assets", "subway_lines.json"),
@@ -62,41 +65,23 @@ CONFIG = {
     "train_depth": -15,
 }
 
-# Viewport bounds (from subway_lines.json analysis)
-VIEWPORT = {
-    "minX": 158,
-    "maxX": 3766,
-    "minZ": -5720,
-    "maxZ": 351,
-}
-
-# Coordinate conversion constants (matching src/utils/coordinates.ts)
-ORIGIN_LAT = 40.7033
-ORIGIN_LNG = -74.017
-METERS_PER_DEGREE_LAT = 111320
-METERS_PER_DEGREE_LNG = METERS_PER_DEGREE_LAT * math.cos(ORIGIN_LAT * math.pi / 180)
-
-
 # =============================================================================
-# Coordinate Conversion
+# Local Coordinate Wrapper
 # =============================================================================
 
 def to_local_coords(lat: float, lon: float, elevation: float = 0) -> List[float]:
     """
     Convert WGS84 coordinates to local meter-based coordinates.
-    Matches src/utils/coordinates.ts toLocalCoords().
+    Wrapper around shared wgs84_to_local that returns list instead of tuple.
     """
-    x = (lon - ORIGIN_LNG) * METERS_PER_DEGREE_LNG
-    z = -(lat - ORIGIN_LAT) * METERS_PER_DEGREE_LAT  # negative because north = negative z
-    y = elevation
-    return [round(x, 1), round(y, 1), round(z, 1)]
+    x, y, z = wgs84_to_local(lat, lon, elevation)
+    return [x, y, z]
 
 
-def is_in_viewport(pos: List[float]) -> bool:
+def check_in_viewport(pos: List[float]) -> bool:
     """Check if position is within viewport bounds."""
     x, y, z = pos
-    return (VIEWPORT["minX"] <= x <= VIEWPORT["maxX"] and
-            VIEWPORT["minZ"] <= z <= VIEWPORT["maxZ"])
+    return is_in_viewport(x, z)
 
 
 # =============================================================================
@@ -324,7 +309,7 @@ def clip_polyline_to_viewport(
             cumulative += math.sqrt(dx * dx + dy * dy + dz * dz)
         distances.append(cumulative)
 
-        if is_in_viewport(polyline[i]):
+        if check_in_viewport(polyline[i]):
             if first_in < 0:
                 first_in = i
             last_in = i
@@ -473,7 +458,7 @@ def process_trips(
                 adjusted_dist = total_length
 
             # Only include stops in viewport
-            if not is_in_viewport(pos):
+            if not check_in_viewport(pos):
                 continue
 
             stops.append({

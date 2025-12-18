@@ -16,28 +16,28 @@ import { BlendFunction } from 'postprocessing';
 
 /**
  * Bloom effect configuration.
- * Targets emissive surfaces like subway lines and station beams.
+ * Subtle bloom for emissive surfaces only (subway lines, beacons).
  */
 export const BLOOM_CONFIG = {
-  /** Bloom intensity multiplier */
-  intensity: 0.8,
-  /** Luminance threshold - pixels brighter than this bloom */
-  luminanceThreshold: 0.3,
+  /** Bloom intensity multiplier - subtle for realism */
+  intensity: 0.3,
+  /** Higher threshold - only very bright things bloom */
+  luminanceThreshold: 0.8,
   /** Smoothness of the luminance threshold falloff */
-  luminanceSmoothing: 0.9,
-  /** Bloom radius in pixels */
-  radius: 0.8,
+  luminanceSmoothing: 0.4,
+  /** Bloom radius in pixels - tighter for realism */
+  radius: 0.4,
 };
 
 /**
  * Vignette effect configuration.
- * Subtle darkening at edges for cinematic look.
+ * Very subtle edge darkening.
  */
 export const VIGNETTE_CONFIG = {
   /** Distance from center where vignette starts (0-1) */
-  offset: 0.3,
-  /** Darkness intensity at edges (0-1) */
-  darkness: 0.5,
+  offset: 0.5,
+  /** Darkness intensity at edges - very subtle */
+  darkness: 0.25,
 };
 
 // =============================================================================

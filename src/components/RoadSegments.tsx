@@ -23,7 +23,7 @@ const DEBUG_SHOW_ROAD_SEGMENTS = false;
 
 /** Road line styling */
 const ROAD_STYLE = {
-  /** Line color - subtle gray */
+  /** Line color - subtle gray for road centerlines */
   color: '#444444',
   /** Line opacity */
   opacity: 0.3,

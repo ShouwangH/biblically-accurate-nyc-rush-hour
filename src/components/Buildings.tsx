@@ -22,7 +22,7 @@ export const BUILDING_MATERIAL_PROPS = {
   color: BUILDING_COLOR,
   roughness: 0.8,
   metalness: 0.1,
-  flatShading: false,
+  flatShading: true, // Enable flat shading to show edges
 } as const;
 
 /** Default path to building model */
@@ -82,6 +82,12 @@ export function Buildings({ url = DEFAULT_BUILDING_URL }: BuildingsProps) {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         mesh.material = buildingMaterial;
+
+        // Recompute normals for flat shading
+        // This ensures each face has its own normal for crisp edges
+        if (mesh.geometry) {
+          mesh.geometry.computeVertexNormals();
+        }
       }
     });
 

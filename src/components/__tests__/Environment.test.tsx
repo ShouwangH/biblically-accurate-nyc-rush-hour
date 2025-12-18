@@ -24,7 +24,7 @@ vi.mock('@react-three/fiber', async () => {
 });
 
 // Import after mocks
-import { Environment, BACKGROUND_COLOR, FOG_COLOR, FOG_NEAR, FOG_FAR } from '../Environment';
+import { Environment, FOG_COLOR, FOG_NEAR, FOG_FAR } from '../Environment';
 
 describe('Environment', () => {
   beforeEach(() => {
@@ -32,13 +32,9 @@ describe('Environment', () => {
   });
 
   describe('constants', () => {
-    it('exports background color as off-white for projector', () => {
-      // #F5F5F0 or similar light color
-      expect(BACKGROUND_COLOR).toMatch(/^#[fF][0-9a-fA-F]{5}$/);
-    });
-
-    it('exports fog color matching background', () => {
-      expect(FOG_COLOR).toBe(BACKGROUND_COLOR);
+    it('exports fog color for sky horizon blend', () => {
+      // Should be a valid hex color
+      expect(FOG_COLOR).toMatch(/^#[0-9a-fA-F]{6}$/);
     });
 
     it('exports fog distances for city scale', () => {

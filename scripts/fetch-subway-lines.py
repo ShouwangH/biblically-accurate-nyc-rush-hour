@@ -19,6 +19,9 @@ import sys
 from typing import List, Tuple, Dict, Any
 import urllib.request
 
+# Import shared coordinate transformation (uses pyproj for accuracy)
+from coordinates import wgs84_to_local as to_local_coords
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -35,8 +38,8 @@ CONFIG = {
     "min_longitude": -74.02,
     "max_longitude": -73.97,
 
-    # Output path
-    "output_path": os.path.join(os.path.dirname(__file__), "..", "src", "assets", "subway_lines.json"),
+    # Output path (public/assets is served directly by Vite)
+    "output_path": os.path.join(os.path.dirname(__file__), "..", "public", "assets", "subway_lines.json"),
 
     # Cache path for downloaded GeoJSON
     "cache_path": os.path.join(os.path.dirname(__file__), "subway_lines_raw.geojson"),
@@ -95,20 +98,8 @@ MTA_COLORS = {
 }
 
 # =============================================================================
-# Coordinate Conversion
+# Bounds Checking
 # =============================================================================
-
-ORIGIN_LAT = 40.7033  # Battery Park
-ORIGIN_LNG = -74.0170
-METERS_PER_DEGREE_LAT = 111320
-METERS_PER_DEGREE_LNG = 111320 * math.cos(ORIGIN_LAT * math.pi / 180)
-
-def to_local_coords(lat: float, lng: float, elevation: float = 0) -> Tuple[float, float, float]:
-    """Convert WGS84 to local coordinate system (meters)."""
-    x = (lng - ORIGIN_LNG) * METERS_PER_DEGREE_LNG
-    z = -(lat - ORIGIN_LAT) * METERS_PER_DEGREE_LAT
-    y = elevation
-    return (round(x), round(y), round(z))
 
 def is_in_bounds(lat: float, lng: float) -> bool:
     """Check if coordinate is within Manhattan south of 34th."""

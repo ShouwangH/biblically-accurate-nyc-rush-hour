@@ -18,29 +18,24 @@ import math
 from pathlib import Path
 from typing import List, Dict, Tuple
 
+# Import shared coordinate transformation (uses pyproj for accuracy)
+from coordinates import wgs84_to_local, is_in_viewport
+
 # =============================================================================
 # Constants
 # =============================================================================
 
 # Input/Output paths
-LION_GDB = Path(__file__).parent.parent / 'lion' / 'lion.gdb'
+LION_GDB = Path(__file__).parent.parent / 'data' / 'lion' / 'lion' / 'lion.gdb'
 OUTPUT_PATH = Path(__file__).parent.parent / 'public' / 'assets' / 'road_segments_lion.json'
 
-# Viewport bounds (WGS84)
+# Viewport bounds (WGS84) - for filtering raw data before transformation
 BOUNDS = {
     'west': -74.025,
     'east': -73.965,
     'south': 40.698,
     'north': 40.758,
 }
-
-# Origin point (Battery Park) for local coordinate conversion
-ORIGIN_LAT = 40.7033
-ORIGIN_LNG = -74.017
-
-# Meters per degree at NYC latitude
-METERS_PER_DEG_LAT = 111320
-METERS_PER_DEG_LNG = 111320 * math.cos(math.radians(ORIGIN_LAT))
 
 # Traffic direction codes
 # T = Two-way, W = With (From->To), A = Against (To->From), P = Pedestrian
@@ -53,23 +48,21 @@ MAJOR_STREET_PATTERNS = [
     'TUNNEL', 'EXPRESSWAY', 'PARKWAY'
 ]
 
+# Lane estimation based on road type and major classification
+# This provides visual lane width for traffic rendering on roadbed
+LANE_ESTIMATES = {
+    ('highway', True): 4,   # FDR, expressways - 4 lanes
+    ('highway', False): 3,  # Minor highways - 3 lanes
+    ('avenue', True): 3,    # Broadway, major avenues - 3 lanes
+    ('avenue', False): 2,   # Minor avenues - 2 lanes
+    ('street', True): 2,    # Major cross-streets - 2 lanes
+    ('street', False): 1,   # Local streets - 1 lane per direction
+}
+
 
 # =============================================================================
-# Coordinate Conversion
+# Utility Functions
 # =============================================================================
-
-def wgs84_to_local(lng: float, lat: float) -> Tuple[float, float]:
-    """
-    Convert WGS84 coordinates to local meters.
-
-    Origin: Battery Park (40.7033, -74.017)
-    X-axis: positive = east
-    Z-axis: negative = north, positive = south
-    """
-    x = (lng - ORIGIN_LNG) * METERS_PER_DEG_LNG
-    z = -(lat - ORIGIN_LAT) * METERS_PER_DEG_LAT  # Negative because north = negative Z
-    return (round(x, 1), round(z, 1))
-
 
 def compute_heading(from_pt: List[float], to_pt: List[float]) -> float:
     """
@@ -153,6 +146,16 @@ def classify_road_type(street_name: str) -> str:
     return 'street'
 
 
+def estimate_lanes(road_type: str, is_major: bool) -> int:
+    """
+    Estimate number of lanes based on road classification.
+
+    Uses LANE_ESTIMATES lookup table. Returns lanes per direction,
+    matching the CorridorFlowEngine lane offset calculation.
+    """
+    return LANE_ESTIMATES.get((road_type, is_major), 1)
+
+
 def process_features(geojson: dict) -> Tuple[List[dict], Dict[str, dict]]:
     """
     Process GeoJSON features into road segments and nodes.
@@ -193,8 +196,8 @@ def process_features(geojson: dict) -> Tuple[List[dict], Dict[str, dict]]:
         for linestring in geom['coordinates']:
             for coord in linestring:
                 lng, lat = coord[0], coord[1]
-                x, z = wgs84_to_local(lng, lat)
-                all_points.append([x, 0, z])  # Y=0 for ground level
+                x, y, z = wgs84_to_local(lat, lng)  # Note: lat, lon order
+                all_points.append([x, 0, z])  # Y=0 for ground level (ignore elevation)
 
         if len(all_points) < 2:
             continue
@@ -379,15 +382,23 @@ def main():
     build_adjacency(segments, nodes)
     compute_node_positions(segments, nodes)
 
-    # Classify entry/major
+    # Classify entry/major and estimate lanes
     for seg in segments:
         # Entry points: no predecessors
         seg['isEntry'] = len(seg['predecessors']) == 0
         # Major: avenues and highways
         seg['isMajor'] = seg['type'] in ('avenue', 'highway')
+        # Estimate lanes based on type and major classification
+        seg['lanes'] = estimate_lanes(seg['type'], seg['isMajor'])
 
     entry_count = sum(1 for s in segments if s['isEntry'])
     major_count = sum(1 for s in segments if s['isMajor'])
+
+    # Lane statistics
+    lane_counts = {}
+    for seg in segments:
+        lanes = seg['lanes']
+        lane_counts[lanes] = lane_counts.get(lanes, 0) + 1
 
     # Build output
     output = {
@@ -427,6 +438,7 @@ def main():
     print(f"Nodes:         {len(nodes)}")
     print(f"Entry points:  {entry_count}")
     print(f"Major roads:   {major_count}")
+    print(f"Lane distribution: {lane_counts}")
 
     # Validation
     total_succ = sum(len(s['successors']) for s in segments)
